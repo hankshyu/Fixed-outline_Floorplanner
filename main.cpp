@@ -177,10 +177,10 @@ int main(int argc, char *argv[]){
     std::ofstream fout2("initTree.txt", std::ofstream::out);
 
     NUMBER_OF_BLOCKS = NUMBER_OF_SOFT_MODULES + NUMBER_OF_FIXED_MODULES;
-    for(int soft_idx; soft_idx < NUMBER_OF_SOFT_MODULES; soft_idx++){
+    for(int soft_idx = 0; soft_idx < NUMBER_OF_SOFT_MODULES; soft_idx++){
         allblock_vector.push_back(soft_modules_vector[soft_idx]);
     }
-    for(int hard_idx; hard_idx < NUMBER_OF_FIXED_MODULES; hard_idx++){
+    for(int hard_idx = 0; hard_idx < NUMBER_OF_FIXED_MODULES; hard_idx++){
         allblock_vector.push_back(fixed_modules_vector[hard_idx]);
     }
     printf("Packing..\n");
@@ -191,14 +191,14 @@ int main(int argc, char *argv[]){
 
     BST.init(allblock_vector);
     
-    // int floorplan_width, floorplan_height;
-    // BST.boundingBox(&floorplan_width, &floorplan_height);
-    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    int floorplan_width, floorplan_height;
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
     
-    // BST.render();
-    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    BST.render();
+    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
 
     // printf("After Render...\n");
     // for(int i = 0; i < NUMBER_OF_FIXED_MODULES; i++){
@@ -207,7 +207,6 @@ int main(int argc, char *argv[]){
     // for(int i = NUMBER_OF_FIXED_MODULES; i < (NUMBER_OF_FIXED_MODULES+NUMBER_OF_SOFT_MODULES); i++){
     //     printBlock(&blockList[i]);
     // }
-
 
 
     // // printf("Before rotate: (%d, %d @(%d, %d))", blockList[3].width, blockList[3].height, blockList[3].block_x, blockList[3].block_y);

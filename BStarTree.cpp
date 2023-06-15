@@ -175,7 +175,7 @@ void BStarTree::init(std::vector<Block*> blockVector){
 
         double initAspectRatio = 1.0;
         if (currentBlockPointer->width != 0 && currentBlockPointer->height != 0){
-            double initAspectRatio = (double)currentBlockPointer->width / (double)currentBlockPointer->height;
+            double initAspectRatio = (double)currentBlockPointer->width / (double)(currentBlockPointer->height);
         }
 
         this->bTree.push_back(Node(0, 0, newParent, initAspectRatio));
