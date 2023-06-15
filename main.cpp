@@ -173,6 +173,7 @@ int main(int argc, char *argv[]){
 
     /*Start pushing blocks into B*-Tree* and initialize B*-Tree */
     BStarTree BST;
+    int floorplan_width, floorplan_height;
     std::ofstream fout1("initFloorplan.txt", std::ofstream::out);
     std::ofstream fout2("initTree.txt", std::ofstream::out);
 
@@ -190,15 +191,17 @@ int main(int argc, char *argv[]){
     printf("Done packing..\n");
 
     BST.init(allblock_vector);
-    
-    int floorplan_width, floorplan_height;
-    BST.boundingBox(&floorplan_width, &floorplan_height);
-    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
-    
     BST.render();
+    
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    
     printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
     printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    printf("Initialized..\n");
+    for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+        printBlock(allblock_vector[i]);
+    }
+
 
     // printf("After Render...\n");
     // for(int i = 0; i < NUMBER_OF_FIXED_MODULES; i++){
