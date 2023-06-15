@@ -203,33 +203,45 @@ int main(int argc, char *argv[]){
     }
 
 
-    // printf("After Render...\n");
-    // for(int i = 0; i < NUMBER_OF_FIXED_MODULES; i++){
-    //     printBlock(&blockList[i]);
-    // }
-    // for(int i = NUMBER_OF_FIXED_MODULES; i < (NUMBER_OF_FIXED_MODULES+NUMBER_OF_SOFT_MODULES); i++){
-    //     printBlock(&blockList[i]);
-    // }
+
+    int result = BST.perturbRotateBlock(soft_modules_vector[2]);
+    BST.render();
+    printf("Rotate reuslt: %d\n",result);
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+        for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+        printBlock(allblock_vector[i]);
+    }
 
 
-    // // printf("Before rotate: (%d, %d @(%d, %d))", blockList[3].width, blockList[3].height, blockList[3].block_x, blockList[3].block_y);
-    // // printBlock(&blockList[3]);
-    // int result = BST.perturbRotateBlock(&(blockList[3]));
-    // printf("Rotate reuslt: %d\n",result);
-    // BST.render();
-    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
 
 
-    // result = BST.perturbMoveBlock(&(blockList[3]), &(blockList[1]));
-    // printf("Rotate reuslt: %d\n",result);
-    // BST.render();
-    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    result = BST.perturbMoveBlock(soft_modules_vector[1], fixed_modules_vector[2]);
+    BST.render();
+    printf("Move reuslt: %d\n",result);
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+        for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+        printBlock(allblock_vector[i]);
+    }
 
-    // //final print
-    // BST.printFloorplan(fout1, CHIP_WIDTH, CHIP_HEIGHT);
-    // BST.printTree(fout2);
+    result = BST.perturbSwapNode(soft_modules_vector[2], soft_modules_vector[1]);
+    BST.render();
+    printf("Swap reuslt: %d\n",result);
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+        for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+        printBlock(allblock_vector[i]);
+    }
+
+
+
+    //final print
+    BST.printFloorplan(fout1, CHIP_WIDTH, CHIP_HEIGHT);
+    BST.printTree(fout2);
 
 }
 
