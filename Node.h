@@ -3,25 +3,23 @@
 #ifndef NODE_H
 #define NODE_H
 
-#include <string>
-#include <stdio>
+typedef unsigned int uint;
 
-typedef enum BlockType{ 
-    SOFT_BLOCK, 
-    HARD_BLOCK 
-} BLOCKTYPE;
-
-class Node{
-    BLOCKTYPE blocktype;
-    std::string blockname;
+struct Node{
+    uint leftChild;
+    uint rightChild;
+    uint parent;
     
-    unsigned short block_width, block_height;
-    int block_x, block_y; 
-    
-    double block_aspectratio;
+    double aspectRatio; // w/h
 
-    Node ();
+    Node(): leftChild(0), rightChild(0), parent(0), aspectRatio(1.0){}
+    Node(uint l, uint r, uint p, double a = 1.0): leftChild(l), rightChild(r), parent(p), aspectRatio(a){}
 
+    void setLeftChild(uint l){ leftChild = l; }
+    void setRightChild(uint r){ rightChild = r; }
+    void setParent(uint p){ parent = p; }
+    void rotate(){ aspectRatio = 1.0/aspectRatio; }
+    void setAspectRatio(double a){ aspectRatio = a; }
 };
 
 
