@@ -42,4 +42,4 @@ Node_debug.o: Node.cpp Node.h
 
 
 clean:
-	rm -rf *.o *.gch iccad iccad
+	rm -rf *.o *.gch iccad

@@ -52,8 +52,8 @@ void BStarTree::dfs(int blockIndex, int parentx, int parenty, std::list<std::pai
     
     Block* currentBlock = this->blockList[blockIndex];
     Node& currentNode = this->bTree[blockIndex];
-    int currentWidth = sqrt((double)(currentBlock->area)/(currentNode.aspectRatio));
-    int currentHeight = currentWidth * currentNode.aspectRatio;
+    int currentWidth = currentNode.width;
+    int currentHeight = currentNode.height;
 
     std::list<std::pair<int, int>>::iterator leftPoint, leftPointPrev, rightPoint, temp;
     bool leftFound = false, rightFound = false;
@@ -173,12 +173,7 @@ void BStarTree::init(std::vector<Block*> blockVector){
             this->bTree[newParent].setRightChild(i);
         }
 
-        double initAspectRatio = 1.0;
-        if (currentBlockPointer->width != 0 && currentBlockPointer->height != 0){
-            initAspectRatio = (double)currentBlockPointer->width / (double)(currentBlockPointer->height);
-        }
-
-        this->bTree.push_back(Node(0, 0, newParent, initAspectRatio));
+        this->bTree.push_back(Node(0, 0, newParent, currentBlockPointer->width, currentBlockPointer->height));
         this->id2BlockListIndex.insert(std::pair<int,int>(currentBlockPointer->id, i));
     }
     this->isRendered = false;
@@ -189,16 +184,49 @@ void BStarTree::init(std::vector<Block*> blockVector){
 
 int BStarTree::perturbRotateBlock(Block* blockPointer){
     int blockIndex = id2BlockListIndex[blockPointer->id];
-    bTree[blockIndex].aspectRatio = 1.0/bTree[blockIndex].aspectRatio;
+    bTree[blockIndex].rotate();
 
     this->isRendered = false;
     return 1; // ?
 }
 
-int BStarTree::perturbResizeSoftBlock(Block* blockPointer, double newAspectRatio){
-    int blockIndex = id2BlockListIndex[blockPointer->id];
-    bTree[blockIndex].aspectRatio = 1.0/bTree[blockIndex].aspectRatio;
 
+
+/// @param toSquare true if want to make into a square shape, false if want to make into a noodle shape
+/// @return returns 1 if block is successfully changed, 0 if block stays the same
+int BStarTree::perturbResizeSoftBlock(Block* blockPointer, bool toSquare){
+    int blockIndex = id2BlockListIndex[blockPointer->id];
+    Node& currentNode = bTree[blockIndex];
+    int area = blockList[blockIndex]->area;
+    int smallerValue = currentNode.width > currentNode.height ? currentNode.height : currentNode.width;
+    int largerValue = currentNode.width > currentNode.height ? currentNode.width : currentNode.height;
+    int newSmallValue = smallerValue, newLargeValue = largerValue;
+    
+    if (toSquare){
+        for (int i = smallerValue + 1; smallerValue * smallerValue <= area; i++){
+            if (area % i == 0){
+                newSmallValue = i;
+                newLargeValue = area / i;
+                break;
+            }
+        } 
+    }
+    else {
+        for (int i = smallerValue - 1; smallerValue > 0; i--){
+            if (area % i == 0){
+                newSmallValue = i;
+                newLargeValue = area / i;
+                break;
+            }
+        } 
+    }
+
+    if (smallerValue == newSmallValue){
+        return 0;
+    }
+
+    currentNode.width = currentNode.width > currentNode.height ? newLargeValue : newSmallValue;
+    currentNode.height = currentNode.width > currentNode.height ? newSmallValue : newLargeValue;
     this->isRendered = false;
     return 1;
 }
@@ -360,23 +388,21 @@ int BStarTree::perturbSwapNode(Block* swap_a, Block* swap_b){
     left2 = bTree[node2Index].leftChild;
     parent2 = bTree[node2Index].parent;
 
-    if (parent1 != 0){
-        if (bTree[parent1].leftChild == node1Index){
-            bTree[parent1].setLeftChild(node2Index);
-        }
-        else {
-            bTree[parent1].setRightChild(node2Index);
-        }
+
+    if (bTree[parent1].leftChild == node1Index){
+        bTree[parent1].setLeftChild(node2Index);
+    }
+    else {
+        bTree[parent1].setRightChild(node2Index);
+    }
+
+    if (bTree[parent2].leftChild == node2Index){
+        bTree[parent2].setLeftChild(node1Index);
+    }
+    else {
+        bTree[parent2].setRightChild(node1Index);
     }
     
-    if (parent2 != 0){
-        if (bTree[parent2].leftChild == node2Index){
-            bTree[parent2].setLeftChild(node1Index);
-        }
-        else {
-            bTree[parent2].setRightChild(node1Index);
-        }
-    }
 
     if (left1 != 0){
         bTree[left1].setParent(node2Index);
@@ -397,6 +423,7 @@ int BStarTree::perturbSwapNode(Block* swap_a, Block* swap_b){
     bTree[node2Index].setParent(parent1);
     bTree[node2Index].setRightChild(right1);
     bTree[node2Index].setLeftChild(left1);
+    // std::swap(bTree[node1Index], bTree[node2Index]);
 
 
     // if node1Index and node2Index were originally parent & children, some of their pointers will be pointing towards themselves, therefore this needs to be fixed 

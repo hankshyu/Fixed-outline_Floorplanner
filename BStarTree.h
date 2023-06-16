@@ -47,7 +47,7 @@ public:
 
     int perturbRotateBlock(Block* blockPointer);
 
-    int perturbResizeSoftBlock(Block* blockPointer, double newAspectRatio);
+    int perturbResizeSoftBlock(Block* blockPointer, bool toSquare);
 
     int perturbMoveBlock(Block* move_node, Block* to_parent_node);
 
