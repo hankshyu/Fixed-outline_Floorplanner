@@ -29,19 +29,16 @@ int rollPetrubDice(double , double , double , double);
 int rollSoftBlocks(int);
 
 
-
-
-
 int main(int argc, char *argv[]){
 
     //PARAM declerations
     srand(17);
     //-------- SA Related ---------------
 
-    double PETURB_RATIO_ROTATE  = 0.25;
-    double PETURB_RATIO_RESIZE  = 0.25;
-    double PETURB_RATIO_MOVE    = 0.25;
-    double PETURB_RATIO_SWAP    = 0.25;
+    double PETURB_RATIO_ROTATE  = 0.00;
+    double PETURB_RATIO_RESIZE  = 0.00;
+    double PETURB_RATIO_MOVE    = 0.00;
+    double PETURB_RATIO_SWAP    = 1.00;
 
     //Cost function is defined as: Cost_alpha * Area + Cost_beta * WireLength + (1-Cost_alpha-Cost_beta) * (R-RStar)
 
@@ -217,7 +214,8 @@ int main(int argc, char *argv[]){
     // /*Prepare for SA section: Peturb BST for */
     int initial_peturbtype_dice_roll;
     int target0, target1;
-    for(int init_peturb_idx = 0; init_peturb_idx < (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO); init_peturb_idx++){
+    // for(int init_peturb_idx = 0; init_peturb_idx < (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO); init_peturb_idx++){
+    for(int init_peturb_idx = 0; init_peturb_idx < 500; init_peturb_idx++){
 
         initial_peturbtype_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
         
@@ -246,17 +244,14 @@ int main(int argc, char *argv[]){
                 BST.perturbSwapNode(soft_modules_vector[target0], soft_modules_vector[target1]);
                 cout <<"Swap SB" <<target0 << "with SB"<<target1;
         }
-
+        
         cout << endl;
-        if(!BST.getisRendered()) BST.render();
+        BST.render();
         BST.boundingBox(&floorplan_width, &floorplan_height);
-        cout <<"L:"<<BST.getisLegal()<<", "
+        
+        cout <<"L:"<<BST.getisLegal()<<", "<<floorplan_width <<", "<<floorplan_height;
+        cout <<  CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS)<<endl; 
     }
-
-
-
-
-
 
     
     // BST.boundingBox(&floorplan_width, &floorplan_height);
