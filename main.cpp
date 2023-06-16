@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <math.h>
 #include <fstream>
+#include <stdlib.h>
 #include <string>
 #include <vector>
 #include <stdio.h>
@@ -24,16 +25,35 @@ int divisorCloseRoot(long long num);
 double FastSAProb(double deltaC, double temp);
 double CalculateConnection(vector <Connection*>, int);
 void printBlock(Block *block);
+int rollPetrubDice(double , double , double , double);
+int rollSoftBlocks(int);
+
 
 int main(int argc, char *argv[]){
 
     //PARAM declerations
+    srand(17);
     //-------- SA Related ---------------
 
-    double DELTA_AVG;
-    double DELTA_COST;
+    double PETURB_RATIO_ROTATE  = 0.00;
+    double PETURB_RATIO_RESIZE  = 0.00;
+    double PETURB_RATIO_MOVE    = 0.00;
+    double PETURB_RATIO_SWAP    = 1.00;
+
+    //Cost function is defined as: Cost_alpha * Area + Cost_beta * WireLength + (1-Cost_alpha-Cost_beta) * (R-RStar)
+
+    //1. Conduct initial peturbations for (block num) * INITIAL_PETURB_RATIO to collect data;
+    double INITIAL_PETURB_RATIO = 15.0;
+    //These is collected at initial perturbation
+    double DELTA_AVG;   //This is collected at initial perturbation
     double A_NORM;
     double W_NORM;
+    double R_NORM;
+
+    double DELTA_COST;  //This is collected at each rounds(few peturbations)
+
+    //newAspectRatio = currentAspectRatio * PETURB_RESIZE_STEP;
+    double PETURB_RESIZE_STEP = 1.5;
 
     //-------- Input Related ---------------
     //CHIP related variables
@@ -184,60 +204,109 @@ int main(int argc, char *argv[]){
     for(int hard_idx = 0; hard_idx < NUMBER_OF_FIXED_MODULES; hard_idx++){
         allblock_vector.push_back(fixed_modules_vector[hard_idx]);
     }
+    BST.init(allblock_vector);
     printf("Packing..\n");
     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
         printBlock(allblock_vector[i]);
     }
     printf("Done packing..\n");
 
-    BST.init(allblock_vector);
-    BST.render();
+    // /*Prepare for SA section: Peturb BST for */
+    int initial_peturbtype_dice_roll;
+    int target0, target1;
+    // for(int init_peturb_idx = 0; init_peturb_idx < (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO); init_peturb_idx++){
+    for(int init_peturb_idx = 0; init_peturb_idx < 500; init_peturb_idx++){
+
+        initial_peturbtype_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
+        
+        int target0 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+        int target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+        while(target1 == target0) target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+        double original_ratio;
+
+       printf("InitP[%3d] OP:",init_peturb_idx);
+        
+        switch(initial_peturbtype_dice_roll){
+            case 0:     // rotate
+                BST.perturbRotateBlock(soft_modules_vector[target0]);
+                cout <<"Rotate SB" << target0;
+                break;
+            case 1:     // resize
+                original_ratio = (soft_modules_vector[target0]->width) / (soft_modules_vector[target0]->height);
+                BST.perturbResizeSoftBlock(soft_modules_vector[target0], original_ratio * PETURB_RESIZE_STEP);
+                cout <<"Resize SB"<<target0 << "(" <<original_ratio << " -> " << original_ratio * PETURB_RESIZE_STEP <<")";
+                break;
+            case 2:     // move
+                BST.perturbMoveBlock(soft_modules_vector[target0],soft_modules_vector[target1]);
+                cout <<"Move SB" <<target0 << "to parent SB"<<target1;
+                break;
+            default:    //swap
+                BST.perturbSwapNode(soft_modules_vector[target0], soft_modules_vector[target1]);
+                cout <<"Swap SB" <<target0 << "with SB"<<target1;
+        }
+        
+        cout << endl;
+        BST.render();
+        BST.boundingBox(&floorplan_width, &floorplan_height);
+        
+        cout <<"L:"<<BST.getisLegal()<<", "<<floorplan_width <<", "<<floorplan_height;
+        cout <<  CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS)<<endl; 
+    }
+
     
-    BST.boundingBox(&floorplan_width, &floorplan_height);
+    // BST.boundingBox(&floorplan_width, &floorplan_height);
     
-    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
-    printf("Initialized..\n");
-    for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
-        printBlock(allblock_vector[i]);
-    }
+    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    // printf("Initialized..\n");
+    // for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+    //     printBlock(allblock_vector[i]);
+    // }
 
 
 
-    int result = BST.perturbRotateBlock(soft_modules_vector[2]);
-    BST.render();
-    printf("Rotate reuslt: %d\n",result);
-    BST.boundingBox(&floorplan_width, &floorplan_height);
-    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
-        for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
-        printBlock(allblock_vector[i]);
-    }
+    // int result = BST.perturbRotateBlock(soft_modules_vector[2]);
+    // BST.render();
+    // printf("Rotate reuslt: %d\n",result);
+    // BST.boundingBox(&floorplan_width, &floorplan_height);
+    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    //     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+    //     printBlock(allblock_vector[i]);
+    // }
 
 
 
 
-    result = BST.perturbMoveBlock(soft_modules_vector[1], fixed_modules_vector[2]);
-    BST.render();
-    printf("Move reuslt: %d\n",result);
-    BST.boundingBox(&floorplan_width, &floorplan_height);
-    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
-        for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
-        printBlock(allblock_vector[i]);
-    }
+    // result = BST.perturbMoveBlock(soft_modules_vector[1], fixed_modules_vector[2]);
+    // BST.render();
+    // printf("Move reuslt: %d\n",result);
+    // BST.boundingBox(&floorplan_width, &floorplan_height);
+    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    //     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+    //     printBlock(allblock_vector[i]);
+    // }
 
-    result = BST.perturbSwapNode(soft_modules_vector[2], soft_modules_vector[1]);
-    BST.render();
-    printf("Swap reuslt: %d\n",result);
-    BST.boundingBox(&floorplan_width, &floorplan_height);
-    printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
-    printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
-        for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
-        printBlock(allblock_vector[i]);
-    }
+    // result = BST.perturbSwapNode(soft_modules_vector[2], soft_modules_vector[1]);
+    // BST.render();
+    // printf("Swap reuslt: %d\n",result);
+    // BST.boundingBox(&floorplan_width, &floorplan_height);
+    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    //     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+    //     printBlock(allblock_vector[i]);
+    // }
 
-
+    // result = BST.perturbResizeSoftBlock(soft_modules_vector[2], 0.5);
+    // BST.render();
+    // printf("resize reuslt: %d\n",result);
+    // BST.boundingBox(&floorplan_width, &floorplan_height);
+    // printf("W: %d, H:% d\n", floorplan_width, floorplan_height);
+    // printf("Conn: %lf\n", CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS));
+    //     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+    //     printBlock(allblock_vector[i]);
+    // }
 
     //final print
     BST.printFloorplan(fout1, CHIP_WIDTH, CHIP_HEIGHT);
@@ -300,7 +369,26 @@ void printBlock(Block *block){
 
     cout << setw(8)<<block->blockname << "(" <<block->id <<")]";
     printf(", A: %10d", block->area);
-    printf(", W: %7d, H: %7d, ",block->width, block->height);
+    printf(", W: %7d, H: %7d",block->width, block->height);
     printf(", @X: %7d, @Y: %7d\n",block->block_x, block->block_y);
 
+}
+
+int rollPetrubDice(double rotate, double resize, double move, double swap){
+    //create random between 0 and 9999_9999
+    const int granularity = 100000000;
+    int randomvalue = rand() % granularity;
+    int rotate_b = granularity * rotate;
+    int resize_b = granularity * (rotate + resize);
+    int move_b = granularity * (rotate + resize + move);
+    if(randomvalue < rotate_b) return 0;
+    else if (randomvalue < resize_b) return 1;
+    else if (randomvalue < move_b) return 2;
+    else return 3;
+
+    return -1; // this would never hit
+}
+
+inline int rollSoftBlocks(int soft_block_num){
+    return rand() % soft_block_num;
 }
