@@ -1,5 +1,3 @@
-
-
 #ifndef NODE_H
 #define NODE_H
 
@@ -22,7 +20,6 @@ struct Node{
     void rotate();
     void resize(uint w, uint h);
 };
-
 
 
 #endif /*NODE_H*/
