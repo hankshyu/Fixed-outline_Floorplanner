@@ -3,6 +3,7 @@
 #include <list>
 #include <climits>
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #include <random>
 #include <algorithm>
@@ -203,7 +204,7 @@ int BStarTree::perturbResizeSoftBlock(Block* blockPointer, bool toSquare){
     int newSmallValue = smallerValue, newLargeValue = largerValue;
     
     if (toSquare){
-        for (int i = smallerValue + 1; smallerValue * smallerValue <= area; i++){
+        for (int i = smallerValue + 1; i*i <= area; i++){
             if (area % i == 0){
                 newSmallValue = i;
                 newLargeValue = area / i;
@@ -212,7 +213,7 @@ int BStarTree::perturbResizeSoftBlock(Block* blockPointer, bool toSquare){
         } 
     }
     else {
-        for (int i = smallerValue - 1; smallerValue > 0; i--){
+        for (int i = smallerValue - 1; i > 0; i--){
             if (area % i == 0){
                 newSmallValue = i;
                 newLargeValue = area / i;
@@ -238,7 +239,8 @@ int BStarTree::perturbMoveBlock(Block* move_node, Block* to_parent_node){
         return 0;
     }
     removeFromTree(moveNodeIndex);
-    insertNode(moveNodeIndex, destinationNodeIndex);
+    int leftOrRight = dist1(rng);
+    insertNode(moveNodeIndex, destinationNodeIndex, (bool)leftOrRight);
 
     this->isRendered = false;
     return 1;
@@ -322,60 +324,88 @@ void BStarTree::recursiveBubbleUpNode(int blockIndex, int isWhichChild){
     }
 }
 
-void BStarTree::insertNode(int moveIndex, int destinationIndex){
-    int leftOrRight = dist1(rng);
-    int anotherLeftOrRight = dist1(rng);
-    if (leftOrRight == 0){
+void BStarTree::insertNode(int moveIndex, int destinationIndex, bool rightChildOfDest){
+    if (!rightChildOfDest){
         // node1 will be inserted in left child of node 2
-        if (anotherLeftOrRight == 0){
-            // original left child of node 2 will become left child of node1
-            if (bTree[destinationIndex].leftChild != 0){
-                int leftChildIndex = bTree[destinationIndex].leftChild;
-                bTree[leftChildIndex].setParent(moveIndex);
-            }
-            bTree[moveIndex].setLeftChild(bTree[destinationIndex].leftChild);
-            bTree[moveIndex].setRightChild(0);
-            bTree[moveIndex].setParent(destinationIndex);
-            bTree[destinationIndex].setLeftChild(moveIndex);
+        // original left child of node 2 will become left child of node1
+        if (bTree[destinationIndex].leftChild != 0){
+            int leftChildIndex = bTree[destinationIndex].leftChild;
+            bTree[leftChildIndex].setParent(moveIndex);
         }
-        else {
-            // original left child of node 2 will become right child of node1            
-            if (bTree[destinationIndex].leftChild != 0){
-                int leftChildIndex = bTree[destinationIndex].leftChild;
-                bTree[leftChildIndex].setParent(moveIndex);
-            }
-            bTree[moveIndex].setLeftChild(0);
-            bTree[moveIndex].setRightChild(bTree[destinationIndex].leftChild);
-            bTree[moveIndex].setParent(destinationIndex);
-            bTree[destinationIndex].setLeftChild(moveIndex);
-        }
+        bTree[moveIndex].setLeftChild(bTree[destinationIndex].leftChild);
+        bTree[moveIndex].setRightChild(0);
+        bTree[moveIndex].setParent(destinationIndex);
+        bTree[destinationIndex].setLeftChild(moveIndex);
     }
     else {
         // node 1 will be inserted in right child of node 2
-        if (anotherLeftOrRight == 0){
-            // original right child of node 2 will become left child of node1         
-            if (bTree[destinationIndex].rightChild != 0){
-                int rightChildIndex = bTree[destinationIndex].rightChild;
-                bTree[rightChildIndex].setParent(moveIndex);
-            }
-            bTree[moveIndex].setLeftChild(bTree[destinationIndex].rightChild);
-            bTree[moveIndex].setRightChild(0);
-            bTree[moveIndex].setParent(destinationIndex);
-            bTree[destinationIndex].setRightChild(moveIndex);   
+        // original right child of node 2 will become right child of node1
+        if (bTree[destinationIndex].rightChild != 0){
+            int rightChildIndex = bTree[destinationIndex].rightChild;
+            bTree[rightChildIndex].setParent(moveIndex);
         }
-        else {
-            // original right child of node 2 will become right child of node1
-            if (bTree[destinationIndex].rightChild != 0){
-                int rightChildIndex = bTree[destinationIndex].rightChild;
-                bTree[rightChildIndex].setParent(moveIndex);
-            }
-            bTree[moveIndex].setLeftChild(0);
-            bTree[moveIndex].setRightChild(bTree[destinationIndex].rightChild);
-            bTree[moveIndex].setParent(destinationIndex);
-            bTree[destinationIndex].setRightChild(moveIndex);   
-        }
+        bTree[moveIndex].setLeftChild(0);
+        bTree[moveIndex].setRightChild(bTree[destinationIndex].rightChild);
+        bTree[moveIndex].setParent(destinationIndex);
+        bTree[destinationIndex].setRightChild(moveIndex);   
     }
 }
+
+
+// void BStarTree::insertNode(int moveIndex, int destinationIndex){
+//     int leftOrRight = dist1(rng);
+//     int anotherLeftOrRight = dist1(rng);
+//     if (leftOrRight == 0){
+//         // node1 will be inserted in left child of node 2
+//         if (anotherLeftOrRight == 0){
+//             // original left child of node 2 will become left child of node1
+//             if (bTree[destinationIndex].leftChild != 0){
+//                 int leftChildIndex = bTree[destinationIndex].leftChild;
+//                 bTree[leftChildIndex].setParent(moveIndex);
+//             }
+//             bTree[moveIndex].setLeftChild(bTree[destinationIndex].leftChild);
+//             bTree[moveIndex].setRightChild(0);
+//             bTree[moveIndex].setParent(destinationIndex);
+//             bTree[destinationIndex].setLeftChild(moveIndex);
+//         }
+//         else {
+//             // original left child of node 2 will become right child of node1            
+//             if (bTree[destinationIndex].leftChild != 0){
+//                 int leftChildIndex = bTree[destinationIndex].leftChild;
+//                 bTree[leftChildIndex].setParent(moveIndex);
+//             }
+//             bTree[moveIndex].setLeftChild(0);
+//             bTree[moveIndex].setRightChild(bTree[destinationIndex].leftChild);
+//             bTree[moveIndex].setParent(destinationIndex);
+//             bTree[destinationIndex].setLeftChild(moveIndex);
+//         }
+//     }
+//     else {
+//         // node 1 will be inserted in right child of node 2
+//         if (anotherLeftOrRight == 0){
+//             // original right child of node 2 will become left child of node1         
+//             if (bTree[destinationIndex].rightChild != 0){
+//                 int rightChildIndex = bTree[destinationIndex].rightChild;
+//                 bTree[rightChildIndex].setParent(moveIndex);
+//             }
+//             bTree[moveIndex].setLeftChild(bTree[destinationIndex].rightChild);
+//             bTree[moveIndex].setRightChild(0);
+//             bTree[moveIndex].setParent(destinationIndex);
+//             bTree[destinationIndex].setRightChild(moveIndex);   
+//         }
+//         else {
+//             // original right child of node 2 will become right child of node1
+//             if (bTree[destinationIndex].rightChild != 0){
+//                 int rightChildIndex = bTree[destinationIndex].rightChild;
+//                 bTree[rightChildIndex].setParent(moveIndex);
+//             }
+//             bTree[moveIndex].setLeftChild(0);
+//             bTree[moveIndex].setRightChild(bTree[destinationIndex].rightChild);
+//             bTree[moveIndex].setParent(destinationIndex);
+//             bTree[destinationIndex].setRightChild(moveIndex);   
+//         }
+//     }
+// }
 
 int BStarTree::perturbSwapNode(Block* swap_a, Block* swap_b){
     int node1Index = id2BlockListIndex[swap_a->id];
@@ -485,7 +515,11 @@ void BStarTree::loadPrevCurrent(){
     this->isRendered = false;
 }
 
-void BStarTree::printTree(std::ostream& fout){
+void BStarTree::printTree(std::string filename){
+    std::ofstream fout(filename, std::ofstream::out);
+    if (!fout.is_open()){
+        return;
+    }
     fout << "Root node: " << bTree[0].rightChild << '\n';
     for (int i = 1; i <= total_block_num; i++){
         fout << "\nNode " << std::setw(3) << i << '\n'; 
@@ -495,7 +529,11 @@ void BStarTree::printTree(std::ostream& fout){
 
 }
 
-void BStarTree::printFloorplan(std::ostream& fout, int fixedOutlineWidth, int fixedOutlineHeight){
+void BStarTree::printFloorplan(std::string filename, int fixedOutlineWidth, int fixedOutlineHeight){
+    std::ofstream fout(filename, std::ofstream::out);
+    if (!fout.is_open()){
+        return;
+    }
     int frameWidth = boundingBoxMaxX > fixedOutlineWidth ? boundingBoxMaxX+100 : fixedOutlineWidth+100;
     int frameHeight = boundingBoxMaxY > fixedOutlineHeight ? boundingBoxMaxY+100 : fixedOutlineHeight+100;
     fout << total_block_num+1 << '\n';

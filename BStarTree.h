@@ -2,7 +2,7 @@
 #define BSTARTREE_H
 
 #include <vector>
-#include <iostream>
+#include <string>
 #include <map>
 #include <random>
 #include <utility>
@@ -20,7 +20,7 @@ class BStarTree{
 private:
     bool checkLegal();
     void dfs(int blockIndex, int parentx, int parenty, std::list<std::pair<int,int>>& horiContour);
-    void insertNode(int moveIndex, int destinationIndex);
+    void insertNode(int moveIndex, int destinationIndex, bool rightChildOfDest);
     void removeFromTree(int removeIndex);
     void recursiveBubbleUpNode(int blockIndex, int isWhichChild);
     int soft_block_num;
@@ -61,8 +61,8 @@ public:
     void saveCurrent();
     void loadPrevCurrent();
 
-    void printTree(std::ostream& fout);
-    void printFloorplan(std::ostream& fout, int fixedOutlineWidth, int fixedOutlineHeight);
+    void printTree(std::string filename);
+    void printFloorplan(std::string filename, int fixedOutlineWidth, int fixedOutlineHeight);
     
     void render();
     bool getisLegal(){return this->isLegal;}

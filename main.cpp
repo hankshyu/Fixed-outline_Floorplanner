@@ -42,8 +42,8 @@ int main(int argc, char *argv[]){
     double PETURB_RATIO_SWAP    = 0.25;
 
     //Cost function is defined as: COST_ALPHA * Area + COST_BETA * WireLength + (1 - COST_ALPHA - COST_BETA) * abs(Aspect Ratio - R_Star);
-    double COST_ALPHA   = 0.35;
-    double COST_BETA    = 0.5;
+    double COST_ALPHA   = 0.4;
+    double COST_BETA    = 0.2;
     double R_Star;      //Average Aspect Ratio
 
     //1. Conduct initial peturbations for (block num) * INITIAL_PETURB_RATIO to collect data;
@@ -60,6 +60,7 @@ int main(int argc, char *argv[]){
     double SA_INITIAL_ACCEPT_RATE_P = 0.97;
     double SA_temperature, SA_temperature_T1;
     int SSA_PETURB_PER_TEMPERATURE = 10;
+    int SA_PERTURB_PER_BLOCK = 5; // for each temp, # of perturbations = SA_PERTURB_PER_BLOCK * blockNUm
     
     int SA_RUN_PHASE2_RNDS = 25;    //Runs this much phase 2
     int SA_RUN_PHASE3_RNDS = 45;   //Runs this much phase 3
@@ -212,8 +213,6 @@ int main(int argc, char *argv[]){
     /*Start pushing blocks into B*-Tree* and initialize B*-Tree */
     BStarTree BST;
     int floorplan_width, floorplan_height;
-    std::ofstream fout1("initFloorplan.txt", std::ofstream::out);
-    std::ofstream fout2("initTree.txt", std::ofstream::out);
 
     NUMBER_OF_BLOCKS = NUMBER_OF_SOFT_MODULES + NUMBER_OF_FIXED_MODULES;
     R_Star = CHIP_HEIGHT/CHIP_WIDTH;
@@ -346,6 +345,7 @@ int main(int argc, char *argv[]){
     double sa_peturb_area, sa_petrub_wirelength, sa_peturb_ratio;
     double sa_petrub_raw_cost, sa_petrub_raw_last_cost, sa_petrub_raw_diff;
     double sa_peturb_cost, sa_peturb_last_cost, sa_peturb_cost_diff;
+    double sa_delta_cost_avg;
 
     double sa_probability;
     double sa_uphill;
@@ -368,8 +368,15 @@ int main(int argc, char *argv[]){
     cout <<",Cost: "<< sa_peturb_cost <<endl;
 
     for(int sa_n = 0; sa_n  < (1 + SA_RUN_PHASE2_RNDS + SA_RUN_PHASE3_RNDS); sa_n++){
+        
+        if(sa_n < 1) cout <<"P1";
+        else if(sa_n < (1+SA_RUN_PHASE2_RNDS)) cout <<"P2";
+        else cout <<"P3";
+        printf("[%5d] \t\n",sa_n + 1);
 
-        for(int sa_pt = 0; sa_pt < SSA_PETURB_PER_TEMPERATURE; sa_pt++){
+        sa_delta_cost_avg = 0;
+
+        for(int sa_pt = 0; sa_pt < NUMBER_OF_SOFT_MODULES * SA_PERTURB_PER_BLOCK ; sa_pt++){
             sa_peturb_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
             
             sa_target0 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
@@ -397,76 +404,78 @@ int main(int argc, char *argv[]){
             }
             // cout << endl;
             BST.render();
-        }
+
         
-        BST.boundingBox(&floorplan_width, &floorplan_height);
-        sa_peturb_area = floorplan_width * floorplan_height;
-        sa_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
-        assert(floorplan_width >= 0);
-        sa_peturb_ratio = floorplan_height/ floorplan_width;
-        sa_peturb_ratio = absDiffDouble(R_Star, sa_peturb_ratio);
-        
-        sa_peturb_last_cost = sa_peturb_cost; // latch the last cost
-        sa_peturb_cost = (COST_ALPHA * sa_peturb_area/A_norm) + (COST_BETA * sa_petrub_wirelength/W_norm) + 
-        ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio/RtoRstar_norm);
-        sa_peturb_cost_diff = sa_peturb_cost - sa_peturb_last_cost;
-        
-
-        sa_petrub_raw_last_cost = sa_petrub_raw_cost; // latch the last raw cost
-        sa_petrub_raw_cost = (COST_ALPHA * sa_peturb_area) + (COST_BETA * sa_petrub_wirelength) + 
-        ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio);
-        sa_petrub_raw_diff = sa_petrub_raw_cost - sa_petrub_raw_last_cost;
-
-        sa_probability = FastSAProb(sa_petrub_raw_diff, SA_temperature);
-        sa_uphill = acceptUpHill(sa_probability);
-
-        if(sa_n < 1) cout <<"P1";
-        else if(sa_n < (1+SA_RUN_PHASE2_RNDS)) cout <<"P2";
-        else cout <<"P3";
-
-        printf("[%5d] \t",sa_n + 1);
-
-
-
-        if(sa_peturb_cost < sa_peturb_last_cost){ // this is a downhill movement, accept!
-            cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< floorplan_width*floorplan_height << ", HPWL: ";
-            cout <<  sa_petrub_wirelength;
-            cout <<",Cost: "<< sa_peturb_cost;
-            cout <<" *IMPROVED* "<< ", Temp: " << SA_temperature <<endl;
-            BST.saveCurrent();
-        }else{ //this is a uphill movement
-            cout <<endl;
+            BST.boundingBox(&floorplan_width, &floorplan_height);
+            sa_peturb_area = floorplan_width * floorplan_height;
+            sa_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
+            assert(floorplan_width >= 0);
+            sa_peturb_ratio = floorplan_height/ floorplan_width;
+            sa_peturb_ratio = absDiffDouble(R_Star, sa_peturb_ratio);
             
-            cout <<" *UPHILL*";
-            cout <<" Cdiff: +"<<sa_peturb_cost_diff;
-            cout << ", Temp: " << SA_temperature;
-            cout << ", Prob: "<< sa_probability;
-            cout << ", Yes/No: " << sa_uphill <<endl;
+            sa_peturb_last_cost = sa_peturb_cost; // latch the last cost
+            sa_peturb_cost = (COST_ALPHA * sa_peturb_area/A_norm) + (COST_BETA * sa_petrub_wirelength/W_norm) + 
+            ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio/RtoRstar_norm);
+            sa_peturb_cost_diff = sa_peturb_cost - sa_peturb_last_cost;
+            sa_delta_cost_avg += sa_peturb_cost_diff;    // add to delta avg cost
             
-            if(sa_uphill == true){
+
+            sa_petrub_raw_last_cost = sa_petrub_raw_cost; // latch the last raw cost
+            sa_petrub_raw_cost = (COST_ALPHA * sa_peturb_area) + (COST_BETA * sa_petrub_wirelength) + 
+            ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio);
+            sa_petrub_raw_diff = sa_petrub_raw_cost - sa_petrub_raw_last_cost;
+
+            sa_probability = FastSAProb(sa_petrub_raw_diff, SA_temperature);
+            sa_uphill = acceptUpHill(sa_probability);
+
+
+
+            if(sa_peturb_cost < sa_peturb_last_cost){ // this is a downhill movement, accept!
+                // cout <<" *IMPROVED* ";
+                // cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< floorplan_width*floorplan_height << ", HPWL: ";
+                // cout <<  sa_petrub_wirelength;
+                // cout <<",Cost: "<< sa_peturb_cost;
+                // // cout << ", Temp: " << SA_temperature;
+                // cout << endl;
                 BST.saveCurrent();
-            }else{
-                BST.loadPrevCurrent();
-                sa_petrub_raw_cost = sa_petrub_raw_last_cost;
-                sa_peturb_cost = sa_peturb_last_cost;
+            }else{ //this is a uphill movement
+                // cout <<endl;
+                
+                // cout <<" *UPHILL*";
+                // cout <<" Cdiff: +"<<sa_peturb_cost_diff;
+                // cout << ", Temp: " << SA_temperature;
+                // cout << ", Prob: "<< sa_probability;
+                // cout << ", Accept: " << sa_uphill <<endl;
+                
+                if(sa_uphill == true){
+                    BST.saveCurrent();
+                }else{
+                    BST.loadPrevCurrent();
+                    sa_petrub_raw_cost = sa_petrub_raw_last_cost;
+                    sa_peturb_cost = sa_peturb_last_cost;
 
 
+                }
             }
+
+
         }
-        
+
+        sa_delta_cost_avg = sa_delta_cost_avg / (NUMBER_OF_SOFT_MODULES * SA_PERTURB_PER_BLOCK);
         //adjust temperature
+        cout << "ADJUSTING TEMP: " << sa_delta_cost_avg << '\n';
         if(sa_n < (1 + SA_RUN_PHASE2_RNDS)){ // At Phase 2
             // cout << "absdouble sapetb: " << (absDouble(sa_peturb_cost_diff)*0.01 + 0.99) <<endl;
             // cout << "noabs sapetb: " << sa_peturb_cost_diff <<endl;
-            SA_temperature = (SA_temperature_T1 * (absDouble(sa_peturb_cost_diff)*0.00001 + 0.99999)) 
+            SA_temperature = (SA_temperature_T1 * sa_delta_cost_avg) 
                             / ((sa_n+1) * (SA_PHASE2_C));
         
         }else{ // At Phase 3
-            SA_temperature = (SA_temperature_T1 * (absDouble(sa_peturb_cost_diff)*0.00001 + 0.99999)) 
+            SA_temperature = (SA_temperature_T1 * sa_delta_cost_avg) 
                             / (sa_n + 1);
 
         }
-        
+        cout << endl;
     }
 
     BST.boundingBox(&floorplan_width, &floorplan_height);
@@ -475,11 +484,15 @@ int main(int argc, char *argv[]){
     assert(floorplan_width >= 0);
     sa_peturb_ratio = floorplan_height/ floorplan_width;
 
-
+    for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
+        printBlock(allblock_vector[i]);
+    }
     
     //final print
-    BST.printFloorplan(fout1, CHIP_WIDTH, CHIP_HEIGHT);
-    BST.printTree(fout2);
+    std::string filename1 = "initFloorplan.txt";
+    std::string filename2 = "initTree.txt";
+    BST.printFloorplan(filename1, CHIP_WIDTH, CHIP_HEIGHT);
+    BST.printTree(filename2);
 
 }
 
