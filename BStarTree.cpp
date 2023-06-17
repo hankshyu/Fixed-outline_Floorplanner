@@ -456,12 +456,14 @@ void BStarTree::boundingBox(int* width, int* height){
 }
 
 void BStarTree::saveBest(){
+    bestBTree.resize(bTree.size());
     auto first = bTree.begin();
     auto last = bTree.end();
     std::copy(first, last, bestBTree.begin());
 }
 
 void BStarTree::loadBest(){
+    bTree.resize(bestBTree.size());
     auto first = bestBTree.begin();
     auto last = bestBTree.end();
     std::copy(first, last, bTree.begin());
@@ -469,12 +471,14 @@ void BStarTree::loadBest(){
 }
 
 void BStarTree::saveCurrent(){
+    savedBTree.resize(bTree.size());
     auto first = bTree.begin();
     auto last = bTree.end();
     std::copy(first, last, savedBTree.begin());
 }
 
 void BStarTree::loadPrevCurrent(){
+    bTree.resize(savedBTree.size());
     auto first = savedBTree.begin();
     auto last = savedBTree.end();
     std::copy(first, last, bTree.begin());

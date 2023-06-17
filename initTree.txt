@@ -2,80 +2,80 @@ Root node: 20
 
 Node   1
 BlockID:   0  Block name: COM
-l:  10  r:   0  p:   3
+l:   0  r:  13  p:   7
 
 Node   2
 BlockID:   1  Block name: GPU
-l:   3  r:  19  p:  18
+l:   0  r:  15  p:   8
 
 Node   3
 BlockID:   2  Block name: CPU
-l:   1  r:   9  p:   2
+l:   0  r:   0  p:  20
 
 Node   4
 BlockID:   3  Block name: NPU
-l:   0  r:   5  p:  13
+l:   8  r:   0  p:  14
 
 Node   5
 BlockID:   4  Block name: IS0
-l:   0  r:   7  p:   4
+l:   0  r:   0  p:  17
 
 Node   6
 BlockID:   5  Block name: IS1
-l:   0  r:   0  p:  12
+l:   9  r:   0  p:  20
 
 Node   7
 BlockID:   6  Block name: H0
-l:  15  r:  12  p:   5
+l:   1  r:   0  p:   9
 
 Node   8
 BlockID:   7  Block name: H1
-l:  13  r:   0  p:  14
+l:   2  r:  11  p:   4
 
 Node   9
 BlockID:   8  Block name: H2
-l:   0  r:   0  p:   3
+l:   7  r:   0  p:   6
 
 Node  10
 BlockID:   9  Block name: U0
-l:   0  r:   0  p:   1
+l:   0  r:   0  p:  11
 
 Node  11
 BlockID:  10  Block name: D0
-l:  14  r:   0  p:  20
+l:  10  r:   0  p:   8
 
 Node  12
 BlockID:  11  Block name: D1
-l:   0  r:   6  p:   7
+l:   0  r:  18  p:  13
 
 Node  13
 BlockID:  12  Block name: E0
-l:   4  r:   0  p:   8
+l:   0  r:  12  p:   1
 
 Node  14
 BlockID:  13  Block name: A0
-l:   0  r:   8  p:  11
+l:   0  r:   4  p:  19
 
 Node  15
 BlockID:  14  Block name: PW0
-l:   0  r:   0  p:   7
+l:   0  r:  17  p:   2
 
 Node  16
 BlockID: 100  Block name: PAD_D0
-l:  17  r:   0  p:  19
+l:   0  r:   0  p:  17
 
 Node  17
 BlockID: 101  Block name: PAD_D1
-l:   0  r:   0  p:  16
+l:   5  r:  16  p:  15
 
 Node  18
 BlockID: 102  Block name: PAD_D2
-l:   0  r:   2  p:  20
+l:  19  r:   0  p:  12
 
 Node  19
 BlockID: 103  Block name: PAD_D3
-l:   0  r:  16  p:   2
+l:  14  r:   0  p:  18
 
 Node  20
 BlockID: 104  Block name: PAD_U0
-l:  18  r:  11  p:   0
+l:   6  r:   3  p:   0

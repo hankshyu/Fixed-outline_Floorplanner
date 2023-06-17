@@ -25,7 +25,9 @@ double CalculateConnection(vector <Connection*>, int);
 void printBlock(Block *block);
 int rollPetrubDice(double , double , double , double);
 int rollSoftBlocks(int);
-double absdiffdouble(double , double);
+double absDouble(double);
+double absDiffDouble(double , double);
+bool acceptUpHill(double);
 
 
 int main(int argc, char *argv[]){
@@ -45,21 +47,33 @@ int main(int argc, char *argv[]){
     double R_Star;      //Average Aspect Ratio
 
     //1. Conduct initial peturbations for (block num) * INITIAL_PETURB_RATIO to collect data;
-    double INITIAL_PETURB_RATIO = 50.0;
-    //These are collected at initial perturbation
-    double Delta_avg;
+    double INITIAL_PETURB_RATIO = 70.0;
+    int initial_peturb_rounds;
+    //These statistics are collected at initial perturbation
+    double Delta_uphill_avg;   // This records the "UPHILL" average during petrubation
+    double Delta_cost_avg;  // This corcords the average "change" during peturbation
     double A_norm;
     double W_norm;
-    double R_norm;  // Aspect Ratio is defined as: height/width (H/W)
+    double RtoRstar_norm;  // Aspect Ratio is defined as: height/width (H/W)
 
     //2. Start SA
     double SA_INITIAL_ACCEPT_RATE_P = 0.97;
-    double SA_temperature;
-    int SA_PETURB_PET_TEMPERATURE = 10;
+    double SA_temperature, SA_temperature_T1;
+    int SSA_PETURB_PER_TEMPERATURE = 10;
     
-    int SA_RUN_PHASE2_RPUNDS = 30;    //Runs this much phase 2
-    int SA_RUN_PHASE3_RPUNDS = 170;   //Runs this much phase 3
+    int SA_RUN_PHASE2_RNDS = 25;    //Runs this much phase 2
+    int SA_RUN_PHASE3_RNDS = 45;   //Runs this much phase 3
 
+    int SA_PHASE2_C = 6.7;
+
+    assert(PETURB_RATIO_ROTATE > 0 && PETURB_RATIO_ROTATE < 1);
+    assert(PETURB_RATIO_RESIZE > 0 && PETURB_RATIO_RESIZE < 1);
+    assert(PETURB_RATIO_MOVE > 0 && PETURB_RATIO_MOVE < 1);
+    assert(PETURB_RATIO_SWAP > 0 && PETURB_RATIO_SWAP < 1);
+    assert((PETURB_RATIO_ROTATE + PETURB_RATIO_RESIZE + PETURB_RATIO_MOVE + PETURB_RATIO_SWAP) == 1 );
+    assert(COST_ALPHA > 0 && COST_ALPHA < 1);
+    assert(COST_BETA > 0 && COST_BETA < 1);
+    assert((COST_ALPHA + COST_BETA)<= 1);
 
     //-------- Input Related ---------------
     //CHIP related variables
@@ -120,7 +134,6 @@ int main(int argc, char *argv[]){
     //     printf("%10d, %10d x %10d\n",soft_modules_vector[i]->area, soft_modules_vector[i]->width, soft_modules_vector[i]->height);
     // }
 
-
     fin >> readstr >> NUMBER_OF_FIXED_MODULES;
     for(int fixed_idx = 0; fixed_idx < NUMBER_OF_FIXED_MODULES; fixed_idx++){
         Block *fixed_block = new Block;
@@ -138,7 +151,6 @@ int main(int argc, char *argv[]){
     //     cout << target->width << " " <<target->height <<endl;
     // }
     
-
     fin >> readstr >> NUMBER_OF_CONNECTIONS;
     // cout << "connect: " << NUMBER_OF_CONNECTIONS<<endl;
     int found_node;
@@ -216,40 +228,36 @@ int main(int argc, char *argv[]){
         printBlock(allblock_vector[i]);
     }
     BST.init(allblock_vector);
-    BST.boundingBox(&floorplan_width, &floorplan_height);
-    // BST.saveCurrent();
+    BST.saveCurrent();
     
     printf("Init called for BST..\n");
     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
         printBlock(allblock_vector[i]);
     }
 
-
-    cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ", HPWL: ";
-    cout <<  CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS)<<endl; 
-
-
-
     /*Prepare for SA section: Peturb BST for few times to collect the average values of perturbation */
-    assert(PETURB_RATIO_ROTATE > 0 && PETURB_RATIO_ROTATE < 1);
-    assert(PETURB_RATIO_RESIZE > 0 && PETURB_RATIO_RESIZE < 1);
-    assert(PETURB_RATIO_MOVE > 0 && PETURB_RATIO_MOVE < 1);
-    assert(PETURB_RATIO_SWAP > 0 && PETURB_RATIO_SWAP < 1);
-    assert((PETURB_RATIO_ROTATE + PETURB_RATIO_RESIZE + PETURB_RATIO_MOVE + PETURB_RATIO_SWAP) == 1 );
-    assert(COST_ALPHA > 0 && COST_ALPHA < 1);
-    assert(COST_BETA > 0 && COST_BETA < 1);
-    assert((COST_ALPHA + COST_BETA)<= 1);
-    
+    Delta_uphill_avg = Delta_cost_avg = A_norm = W_norm = RtoRstar_norm = 0;
+
     int init_peturbtype_dice_roll;
     int target0, target1;   //Roll the softblocks to peturb;
     bool init_peturb_tosquare;
-    Delta_avg = A_norm = W_norm = R_norm = 0;
 
-    double init_peturb_cost, init_peturb_last_cost;
+    double init_peturb_raw_cost, init_peturb_last_raw_cost, init_peturb_first_raw_cost;
     int init_peturb_uphill_count = 0;
     double init_peturb_area, init_petrub_wirelength, init_peturb_ratio;
 
-    for(int init_peturb_idx = 0; init_peturb_idx < (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO); init_peturb_idx++){
+    //Collect statistics of the initial state for calculation of Delta cost
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    init_peturb_area = floorplan_width * floorplan_height;
+    init_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);    
+    assert(floorplan_width != 0);
+    init_peturb_ratio = floorplan_height/ floorplan_width;    
+    init_peturb_ratio = absDiffDouble(R_Star, init_peturb_ratio);
+    init_peturb_first_raw_cost = init_peturb_raw_cost = (COST_ALPHA * init_peturb_area) + (COST_BETA*init_petrub_wirelength) + 
+        ((1 - COST_ALPHA - COST_BETA) * init_peturb_ratio);
+
+    initial_peturb_rounds =  (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO);
+    for(int init_peturb_idx = 0; init_peturb_idx < initial_peturb_rounds; init_peturb_idx++){
 
         init_peturbtype_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
         
@@ -258,134 +266,217 @@ int main(int argc, char *argv[]){
         while(target1 == target0) target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
         double original_ratio;
 
-        printf("InitP[%3d] OP:",init_peturb_idx);
+        // printf("InitP[%3d] OP:",init_peturb_idx);
         
         switch(init_peturbtype_dice_roll){
             case 0:     // rotate
                 BST.perturbRotateBlock(soft_modules_vector[target0]);
-                cout <<"Rotate SB" << target0;
+                // cout <<"Rotate SB" << target0 <<endl;
                 break;
             case 1:     // resize
                 init_peturb_tosquare = (rand()%2)? true : false;
                 BST.perturbResizeSoftBlock(soft_modules_vector[target0], init_peturb_tosquare);
-                cout <<"Resize SB"<<target0 << "(TS: " << init_peturb_tosquare<< ")";
+                // cout <<"Resize SB"<<target0 << "(TS: " << init_peturb_tosquare<< ")" << endl;
                 break;
             case 2:     // move
                 BST.perturbMoveBlock(soft_modules_vector[target0],soft_modules_vector[target1]);
-                cout <<"Move SB" <<target0 << "to parent SB"<<target1;
+                // cout <<"Move SB" <<target0 << "to parent SB"<<target1 <<endl;
                 break;
             default:    //swap
                 BST.perturbSwapNode(soft_modules_vector[target0], soft_modules_vector[target1]);
-                cout <<"Swap SB" <<target0 << "with SB"<<target1;
+                // cout <<"Swap SB" <<target0 << "with SB"<<target1 <<endl;
         }
 
-        cout << endl;
         BST.render();
         BST.boundingBox(&floorplan_width, &floorplan_height);
         //Calculate the outcome of this peturbation
         init_peturb_area = floorplan_width * floorplan_height;
         init_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
         
+        assert(floorplan_width != 0);
         init_peturb_ratio = floorplan_height/ floorplan_width;
-        init_peturb_ratio = absdiffdouble(R_Star, init_peturb_ratio);
+        
+        init_peturb_ratio = absDiffDouble(R_Star, init_peturb_ratio);
 
-        init_peturb_last_cost = init_peturb_cost;   //latch the old result for calculating Delta
-        init_peturb_cost = (COST_ALPHA * init_peturb_area) + (COST_BETA*init_petrub_wirelength) + 
+        init_peturb_last_raw_cost = init_peturb_raw_cost;   //latch the old result for calculating Delta
+        init_peturb_raw_cost = (COST_ALPHA * init_peturb_area) + (COST_BETA*init_petrub_wirelength) + 
         ((1 - COST_ALPHA - COST_BETA) * init_peturb_ratio);
-        if(init_peturb_idx == 0) init_peturb_last_cost = init_peturb_cost;
 
         //collecting the peturbation data to calculate average
-        if(init_peturb_idx == 0){
-            A_norm = init_peturb_area;
-            W_norm = init_petrub_wirelength;
-            R_norm = init_peturb_ratio;
-        }else{
-            A_norm = ((double)init_peturb_idx/(double)(init_peturb_idx+1))*A_norm + (1/(double)(init_peturb_idx+1))*init_peturb_area;
-            W_norm = ((double)init_peturb_idx/(double)(init_peturb_idx+1))*W_norm + (1/(double)(init_peturb_idx+1))*init_petrub_wirelength;
-            R_norm = ((double)init_peturb_idx/(double)(init_peturb_idx+1))*R_norm + (1/(double)(init_peturb_idx+1))*init_peturb_ratio;
-        }
-        if((init_peturb_idx != 0) && (init_peturb_last_cost < init_peturb_cost)){ // an uphill movement
-            if(init_peturb_uphill_count == 0){
-                Delta_avg = (init_peturb_cost - init_peturb_last_cost);
-            }else{
-                Delta_avg = ((double)init_peturb_uphill_count/(double)(init_peturb_uphill_count+1))*Delta_avg 
-                        + (1/(double)(init_peturb_uphill_count+1))*(init_peturb_cost - init_peturb_last_cost);
-            }
+        A_norm += init_peturb_area;
+        W_norm += init_petrub_wirelength;
+        RtoRstar_norm += init_peturb_ratio;
+        Delta_cost_avg += absDiffDouble(init_peturb_raw_cost, init_peturb_last_raw_cost);
+        if(init_peturb_raw_cost > init_peturb_last_raw_cost){  // an uphill movement
             init_peturb_uphill_count++;
-        } 
+            Delta_uphill_avg += absDiffDouble(init_peturb_raw_cost, init_peturb_last_raw_cost);
+        }
 
-
-        cout <<"["<< init_peturb_idx << "]";
-        cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< floorplan_width*floorplan_height << ", HPWL: ";
-        cout <<  CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS)<<endl; 
+        if(init_peturb_idx % SSA_PETURB_PER_TEMPERATURE == 0){
+            BST.loadPrevCurrent();
+            init_peturb_raw_cost = init_peturb_first_raw_cost;
+        }
+        
+        // cout <<"["<< init_peturb_idx << "]";
+        // cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< floorplan_width*floorplan_height << ", HPWL: ";
+        // cout <<  CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS)<<endl; 
     }
-    // A_norm /= (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO);
-    // W_norm /= (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO);
-    // R_norm /= (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO);
-    // Delta_avg /= init_peturb_uphill_count;
+    A_norm /= initial_peturb_rounds;
+    W_norm /= initial_peturb_rounds;
+    RtoRstar_norm /= initial_peturb_rounds;
+    Delta_cost_avg /= initial_peturb_rounds;
+    Delta_uphill_avg /= init_peturb_uphill_count;
 
+    cout << "Statistics collect phase run " << initial_peturb_rounds <<  " peturbs, uphill: " << init_peturb_uphill_count <<endl;
     cout << "A_norm: " << A_norm <<endl;
-    cout << "W_norm: " << W_norm <<endl;
-    cout << "R_norm: " << R_norm <<endl;
-    cout << "Delta_avg: " << Delta_avg <<endl;
+    cout << "W_norm: " << W_norm <<endl;    
+    cout << "RtoRstar_norm: " << RtoRstar_norm <<endl;
+    cout <<"Delta_cost_avg: " << Delta_cost_avg <<endl;
+    cout << "Delta_uphill_avg: " << Delta_uphill_avg <<endl;
 
     /*Start SA process, this is when n = 1*/
-    // BST.loadPrevCurrent(); // rollback to init
-    // SA_temperature = Delta_avg  / log(SA_INITIAL_ACCEPT_RATE_P);
-    // cout << "Initial SA T: "<<SA_temperature;
+    BST.loadPrevCurrent(); // rollback to init
+    SA_temperature_T1 = SA_temperature = (- Delta_uphill_avg  / log(SA_INITIAL_ACCEPT_RATE_P));
+    cout << endl;
+    cout << "Start SA algo\nInitial SA T: "<<SA_temperature <<endl;
 
-    // int sa_peturb_dice_roll;
-    // int sa_target0, sa_target1;
+    int sa_peturb_dice_roll;
+    int sa_target0, sa_target1;
 
-    // double sa_peturb_area, sa_petrub_wirelength, sa_peturb_ratio;
-    // for(int sa_n = 0; sa_n  < (1 + SA_RUN_PHASE2_RPUNDS + SA_RUN_PHASE3_RPUNDS); sa_n++){
-    // for(int sa_n = 0; sa_n  < (1 ); sa_n++){
+    double sa_peturb_area, sa_petrub_wirelength, sa_peturb_ratio;
+    double sa_petrub_raw_cost, sa_petrub_raw_last_cost, sa_petrub_raw_diff;
+    double sa_peturb_cost, sa_peturb_last_cost, sa_peturb_cost_diff;
 
-    //     for(int sa_pt = 0; sa_pt < SA_PETURB_PET_TEMPERATURE; sa_pt++){
-    //         sa_peturb_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
-            
-    //         sa_target0 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
-    //         sa_target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
-    //         while(target1 == target0) target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+    double sa_probability;
+    double sa_uphill;
 
-    //         // printf("P1[%3d] OP:",init_peturb_idx);
-    //         switch(sa_peturb_dice_roll){
-    //             case 0:     // rotate
-    //                 BST.perturbRotateBlock(soft_modules_vector[sa_target0]);
-    //                 // cout <<"Rotate SB" << sa_target0;
-    //                 break;
-    //             case 1:     // resize
-    //                 init_peturb_tosquare = (rand()%2)? true : false;
-    //                 BST.perturbResizeSoftBlock(soft_modules_vector[sa_target0], init_peturb_tosquare);
-    //                 // cout <<"Resize SB"<<sa_target0 << "(TS: " << init_peturb_tosquare<< ")";
-    //                 break;
-    //             case 2:     // move
-    //                 BST.perturbMoveBlock(soft_modules_vector[sa_target0],soft_modules_vector[sa_target1]);
-    //                 // cout <<"Move SB" <<sa_target0 << "to parent SB"<<target1;
-    //                 break;
-    //             default:    //swap
-    //                 BST.perturbSwapNode(soft_modules_vector[sa_target0], soft_modules_vector[sa_target1]);
-    //                 // cout <<"Swap SB" <<sa_target0 << "with SB"<<target1;
-    //         }
-    //         // cout << endl;
-    //         BST.render();
-    //     }
-    //     BST.boundingBox(&floorplan_width, &floorplan_height);
-    //     sa_peturb_area = floorplan_width * floorplan_height;
-    //     sa_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
-        
-    //     sa_peturb_ratio = floorplan_height/ floorplan_width;
-    //     sa_peturb_ratio = absdiffdouble(R_Star, init_peturb_ratio);
-        
-    //     cout << "Stage 1:"<<endl;
-    //     cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< floorplan_width*floorplan_height << ", HPWL: ";
-    //     cout <<  sa_petrub_wirelength<<endl; 
-
-
-    // }
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    sa_peturb_area = floorplan_width * floorplan_height;
+    sa_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
     
+    assert(floorplan_width >= 0);
+    sa_peturb_ratio = floorplan_height/ floorplan_width;
+    sa_peturb_ratio = absDiffDouble(R_Star, sa_peturb_ratio);
+    sa_petrub_raw_cost = (COST_ALPHA * sa_peturb_area) + (COST_BETA * sa_petrub_wirelength) + 
+    ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio);
+    sa_peturb_cost = (COST_ALPHA * sa_peturb_area/A_norm) + (COST_BETA * sa_petrub_wirelength/W_norm) + 
+    ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio/RtoRstar_norm);
+    
+    cout << "[    0] \t";
+    cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< sa_peturb_area << ", HPWL: ";
+    cout <<  sa_petrub_wirelength;
+    cout <<",Cost: "<< sa_peturb_cost <<endl;
+
+    for(int sa_n = 0; sa_n  < (1 + SA_RUN_PHASE2_RNDS + SA_RUN_PHASE3_RNDS); sa_n++){
+
+        for(int sa_pt = 0; sa_pt < SSA_PETURB_PER_TEMPERATURE; sa_pt++){
+            sa_peturb_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
+            
+            sa_target0 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+            sa_target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+            while(target1 == target0) target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+
+            // printf("P1[%3d] OP:",init_peturb_idx);
+            switch(sa_peturb_dice_roll){
+                case 0:     // rotate
+                    BST.perturbRotateBlock(soft_modules_vector[sa_target0]);
+                    // cout <<"Rotate SB" << sa_target0;
+                    break;
+                case 1:     // resize
+                    init_peturb_tosquare = (rand()%2)? true : false;
+                    BST.perturbResizeSoftBlock(soft_modules_vector[sa_target0], init_peturb_tosquare);
+                    // cout <<"Resize SB"<<sa_target0 << "(TS: " << init_peturb_tosquare<< ")";
+                    break;
+                case 2:     // move
+                    BST.perturbMoveBlock(soft_modules_vector[sa_target0],soft_modules_vector[sa_target1]);
+                    // cout <<"Move SB" <<sa_target0 << "to parent SB"<<target1;
+                    break;
+                default:    //swap
+                    BST.perturbSwapNode(soft_modules_vector[sa_target0], soft_modules_vector[sa_target1]);
+                    // cout <<"Swap SB" <<sa_target0 << "with SB"<<target1;
+            }
+            // cout << endl;
+            BST.render();
+        }
+        
+        BST.boundingBox(&floorplan_width, &floorplan_height);
+        sa_peturb_area = floorplan_width * floorplan_height;
+        sa_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
+        assert(floorplan_width >= 0);
+        sa_peturb_ratio = floorplan_height/ floorplan_width;
+        sa_peturb_ratio = absDiffDouble(R_Star, sa_peturb_ratio);
+        
+        sa_peturb_last_cost = sa_peturb_cost; // latch the last cost
+        sa_peturb_cost = (COST_ALPHA * sa_peturb_area/A_norm) + (COST_BETA * sa_petrub_wirelength/W_norm) + 
+        ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio/RtoRstar_norm);
+        sa_peturb_cost_diff = sa_peturb_cost - sa_peturb_last_cost;
+        
+
+        sa_petrub_raw_last_cost = sa_petrub_raw_cost; // latch the last raw cost
+        sa_petrub_raw_cost = (COST_ALPHA * sa_peturb_area) + (COST_BETA * sa_petrub_wirelength) + 
+        ((1 - COST_ALPHA - COST_BETA) * sa_peturb_ratio);
+        sa_petrub_raw_diff = sa_petrub_raw_cost - sa_petrub_raw_last_cost;
+
+        sa_probability = FastSAProb(sa_petrub_raw_diff, SA_temperature);
+        sa_uphill = acceptUpHill(sa_probability);
+
+        if(sa_n < 1) cout <<"P1";
+        else if(sa_n < (1+SA_RUN_PHASE2_RNDS)) cout <<"P2";
+        else cout <<"P3";
+
+        printf("[%5d] \t",sa_n + 1);
 
 
+
+        if(sa_peturb_cost < sa_peturb_last_cost){ // this is a downhill movement, accept!
+            cout <<"L:"<<BST.getisLegal()<<",W: "<<floorplan_width <<",H: "<<floorplan_height << ",A: "<< floorplan_width*floorplan_height << ", HPWL: ";
+            cout <<  sa_petrub_wirelength;
+            cout <<",Cost: "<< sa_peturb_cost;
+            cout <<" *IMPROVED* "<< ", Temp: " << SA_temperature <<endl;
+            BST.saveCurrent();
+        }else{ //this is a uphill movement
+            cout <<endl;
+            
+            cout <<" *UPHILL*";
+            cout <<" Cdiff: +"<<sa_peturb_cost_diff;
+            cout << ", Temp: " << SA_temperature;
+            cout << ", Prob: "<< sa_probability;
+            cout << ", Yes/No: " << sa_uphill <<endl;
+            
+            if(sa_uphill == true){
+                BST.saveCurrent();
+            }else{
+                BST.loadPrevCurrent();
+                sa_petrub_raw_cost = sa_petrub_raw_last_cost;
+                sa_peturb_cost = sa_peturb_last_cost;
+
+
+            }
+        }
+        
+        //adjust temperature
+        if(sa_n < (1 + SA_RUN_PHASE2_RNDS)){ // At Phase 2
+            // cout << "absdouble sapetb: " << (absDouble(sa_peturb_cost_diff)*0.01 + 0.99) <<endl;
+            // cout << "noabs sapetb: " << sa_peturb_cost_diff <<endl;
+            SA_temperature = (SA_temperature_T1 * (absDouble(sa_peturb_cost_diff)*0.00001 + 0.99999)) 
+                            / ((sa_n+1) * (SA_PHASE2_C));
+        
+        }else{ // At Phase 3
+            SA_temperature = (SA_temperature_T1 * (absDouble(sa_peturb_cost_diff)*0.00001 + 0.99999)) 
+                            / (sa_n + 1);
+
+        }
+        
+    }
+
+    BST.boundingBox(&floorplan_width, &floorplan_height);
+    sa_peturb_area = floorplan_width * floorplan_height;
+    sa_petrub_wirelength = CalculateConnection(connections_vector, NUMBER_OF_CONNECTIONS);
+    assert(floorplan_width >= 0);
+    sa_peturb_ratio = floorplan_height/ floorplan_width;
+
+
+    
     //final print
     BST.printFloorplan(fout1, CHIP_WIDTH, CHIP_HEIGHT);
     BST.printTree(fout2);
@@ -470,10 +561,24 @@ int rollPetrubDice(double rotate, double resize, double move, double swap){
 inline int rollSoftBlocks(int soft_block_num){
     return rand() % soft_block_num;
 }
+inline double absDouble(double d1){
+    return (d1 < 0)? -d1 : d1;
+}
 
-inline double absdiffdouble(double d1, double d2){
+inline double absDiffDouble(double d1, double d2){
     if(d1 > d2) return d1 - d2;
     else return d2 - d1;
 
     return -1;
+}
+
+bool acceptUpHill(double prob){
+    const int granularity = 100000000;
+    int randomvalue = rand() % granularity;
+    const int boundary = granularity * prob;
+    
+    if(randomvalue < boundary) return true;
+    else false;
+
+    return false; // this would never hit
 }
