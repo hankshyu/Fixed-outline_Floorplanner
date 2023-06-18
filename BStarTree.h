@@ -43,7 +43,7 @@ private:
 public:
     BStarTree();
     
-    void init(std::vector<Block*> blockVector); 
+    void init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_HEIGHT);
 
     int perturbRotateBlock(Block* blockPointer);
 

@@ -43,7 +43,7 @@ int main(int argc, char *argv[]){
 
     //Cost function is defined as: COST_ALPHA * Area + COST_BETA * WireLength + (1 - COST_ALPHA - COST_BETA) * abs(Aspect Ratio - R_Star);
     double COST_ALPHA   = 0.4;
-    double COST_BETA    = 0.2;
+    double COST_BETA    = 0.1;
     double R_Star;      //Average Aspect Ratio
 
     //1. Conduct initial peturbations for (block num) * INITIAL_PETURB_RATIO to collect data;
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]){
     double SA_INITIAL_ACCEPT_RATE_P = 0.97;
     double SA_temperature, SA_temperature_T1;
     int SSA_PETURB_PER_TEMPERATURE = 10;
-    int SA_PERTURB_PER_BLOCK = 5; // for each temp, # of perturbations = SA_PERTURB_PER_BLOCK * blockNUm
+    int SA_PERTURB_PER_BLOCK = 7; // for each temp, # of perturbations = SA_PERTURB_PER_BLOCK * blockNUm
     
     int SA_RUN_PHASE2_RNDS = 25;    //Runs this much phase 2
     int SA_RUN_PHASE3_RNDS = 45;   //Runs this much phase 3
@@ -226,9 +226,12 @@ int main(int argc, char *argv[]){
     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
         printBlock(allblock_vector[i]);
     }
-    BST.init(allblock_vector);
+    BST.init(allblock_vector, CHIP_WIDTH, CHIP_HEIGHT);
     BST.saveCurrent();
     
+    std::string filename1 = "initFloorplan.txt";
+    BST.printFloorplan(filename1, CHIP_WIDTH, CHIP_HEIGHT);
+
     printf("Init called for BST..\n");
     for(int i = 0; i < (NUMBER_OF_SOFT_MODULES+NUMBER_OF_FIXED_MODULES); i++){
         printBlock(allblock_vector[i]);
@@ -257,33 +260,35 @@ int main(int argc, char *argv[]){
 
     initial_peturb_rounds =  (NUMBER_OF_BLOCKS * INITIAL_PETURB_RATIO);
     for(int init_peturb_idx = 0; init_peturb_idx < initial_peturb_rounds; init_peturb_idx++){
+        int success = 0;
+        while (success == 0){
+            init_peturbtype_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
+            
+            int target0 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+            int target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+            while(target1 == target0) target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
+            // double original_ratio;
 
-        init_peturbtype_dice_roll = rollPetrubDice(PETURB_RATIO_ROTATE, PETURB_RATIO_RESIZE, PETURB_RATIO_MOVE, PETURB_RATIO_SWAP);
-        
-        int target0 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
-        int target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
-        while(target1 == target0) target1 = rollSoftBlocks(NUMBER_OF_SOFT_MODULES);
-        double original_ratio;
-
-        // printf("InitP[%3d] OP:",init_peturb_idx);
-        
-        switch(init_peturbtype_dice_roll){
-            case 0:     // rotate
-                BST.perturbRotateBlock(soft_modules_vector[target0]);
-                // cout <<"Rotate SB" << target0 <<endl;
-                break;
-            case 1:     // resize
-                init_peturb_tosquare = (rand()%2)? true : false;
-                BST.perturbResizeSoftBlock(soft_modules_vector[target0], init_peturb_tosquare);
-                // cout <<"Resize SB"<<target0 << "(TS: " << init_peturb_tosquare<< ")" << endl;
-                break;
-            case 2:     // move
-                BST.perturbMoveBlock(soft_modules_vector[target0],soft_modules_vector[target1]);
-                // cout <<"Move SB" <<target0 << "to parent SB"<<target1 <<endl;
-                break;
-            default:    //swap
-                BST.perturbSwapNode(soft_modules_vector[target0], soft_modules_vector[target1]);
-                // cout <<"Swap SB" <<target0 << "with SB"<<target1 <<endl;
+            // printf("InitP[%3d] OP:",init_peturb_idx);
+            
+            switch(init_peturbtype_dice_roll){
+                case 0:     // rotate
+                    success = BST.perturbRotateBlock(soft_modules_vector[target0]);
+                    // cout <<"Rotate SB" << target0 <<endl;
+                    break; 
+                case 1:     // resize
+                    init_peturb_tosquare = (rand()%2)? true : false;
+                    success = BST.perturbResizeSoftBlock(soft_modules_vector[target0], init_peturb_tosquare);
+                    // cout <<"Resize SB"<<target0 << "(TS: " << init_peturb_tosquare<< ")" << endl;
+                    break;
+                case 2:     // move
+                    success = BST.perturbMoveBlock(soft_modules_vector[target0],soft_modules_vector[target1]);
+                    // cout <<"Move SB" <<target0 << "to parent SB"<<target1 <<endl;
+                    break;
+                default:    //swap
+                    success = BST.perturbSwapNode(soft_modules_vector[target0], soft_modules_vector[target1]);
+                    // cout <<"Swap SB" <<target0 << "with SB"<<target1 <<endl;
+            }
         }
 
         BST.render();
@@ -489,10 +494,8 @@ int main(int argc, char *argv[]){
     }
     
     //final print
-    std::string filename1 = "initFloorplan.txt";
-    std::string filename2 = "initTree.txt";
-    BST.printFloorplan(filename1, CHIP_WIDTH, CHIP_HEIGHT);
-    BST.printTree(filename2);
+    std::string filename2 = "finalFloorplan.txt";
+    BST.printFloorplan(filename2, CHIP_WIDTH, CHIP_HEIGHT);
 
 }
 

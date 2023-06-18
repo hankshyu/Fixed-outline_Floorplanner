@@ -148,24 +148,71 @@ void BStarTree::dfs(int blockIndex, int parentx, int parenty, std::list<std::pai
     return;
 }
 
-void BStarTree::init(std::vector<Block*> blockVector){
+// void BStarTree::init(std::vector<Block*> blockVector){
+
+//     this->bTree.push_back(Node()); // dummy node, represents head of btree
+//     this->blockList.push_back(NULL);
+//     for (int i = 1; i <= blockVector.size(); i++){
+//         Block* currentBlockPointer = blockVector[i-1];
+
+//         if (currentBlockPointer->blocktype == SOFT_BLOCK){
+//             this->soft_block_num++;
+//         }
+//         else { 
+//             this->hard_block_num++;
+//         }
+//         this->total_block_num++;
+
+//         this->blockList.push_back(currentBlockPointer);
+//         uint newParent = i/2;
+//         if (i == newParent*2){
+//             // is a left child of parent node
+//             this->bTree[newParent].setLeftChild(i);
+//         }
+//         else {
+//             // is a right child of parent node
+//             this->bTree[newParent].setRightChild(i);
+//         }
+
+//         this->bTree.push_back(Node(0, 0, newParent, currentBlockPointer->width, currentBlockPointer->height));
+//         this->id2BlockListIndex.insert(std::pair<int,int>(currentBlockPointer->id, i));
+//     }
+//     this->isRendered = false;
+
+//     // bool isLegal = checkLegal();
+//     render();
+// }
+
+
+void BStarTree::init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_HEIGHT) {
+
+    std::vector<Block*> topBlock, bottomBlock, leftBlock, rightBlock;
 
     this->bTree.push_back(Node()); // dummy node, represents head of btree
     this->blockList.push_back(NULL);
-    for (int i = 1; i <= blockVector.size(); i++){
-        Block* currentBlockPointer = blockVector[i-1];
+    for ( int i = 1; i <= blockVector.size(); i++ ) {
+        Block* currentBlockPointer = blockVector[i - 1];
 
-        if (currentBlockPointer->blocktype == SOFT_BLOCK){
+        if ( currentBlockPointer->blocktype == SOFT_BLOCK ) {
             this->soft_block_num++;
         }
-        else { 
+        else {
             this->hard_block_num++;
+            // categorize hard blocks
+            if ( currentBlockPointer->block_y == 0 )
+                bottomBlock.push_back(currentBlockPointer);
+            else if ( currentBlockPointer->block_x == 0 )
+                leftBlock.push_back(currentBlockPointer);
+            else if ( currentBlockPointer->block_x + currentBlockPointer->width >= CHIP_WIDTH )
+                rightBlock.push_back(currentBlockPointer);
+            else if ( currentBlockPointer->block_y + currentBlockPointer->height >= CHIP_HEIGHT )
+                topBlock.push_back(currentBlockPointer);
         }
         this->total_block_num++;
 
         this->blockList.push_back(currentBlockPointer);
-        uint newParent = i/2;
-        if (i == newParent*2){
+        uint newParent = i / 2;
+        if ( i == newParent * 2 ) {
             // is a left child of parent node
             this->bTree[newParent].setLeftChild(i);
         }
@@ -175,10 +222,57 @@ void BStarTree::init(std::vector<Block*> blockVector){
         }
 
         this->bTree.push_back(Node(0, 0, newParent, currentBlockPointer->width, currentBlockPointer->height));
-        this->id2BlockListIndex.insert(std::pair<int,int>(currentBlockPointer->id, i));
+        this->id2BlockListIndex.insert(std::pair<int, int>(currentBlockPointer->id, i));
     }
-    this->isRendered = false;
 
+    std::sort(bottomBlock.begin(), bottomBlock.end(), [](Block* a, Block* b) {return a->block_x < b->block_x; });
+    std::sort(leftBlock.begin(), leftBlock.end(), [](Block* a, Block* b) {return a->block_y < b->block_y; });
+    std::sort(rightBlock.begin(), rightBlock.end(), [](Block* a, Block* b) {return a->block_y < b->block_y; });
+    std::sort(topBlock.begin(), topBlock.end(), [](Block* a, Block* b) {return a->block_x < b->block_x; });
+
+    // traverse to leftmost node
+    int leftmostNode = 1;
+    while ( bTree[leftmostNode].leftChild != 0 ) {
+        leftmostNode = bTree[leftmostNode].leftChild;
+    }
+    // move bottom hard block
+    for ( int i = 0; i < bottomBlock.size(); i++ ) {
+        int curNode = id2BlockListIndex[bottomBlock[i]->id];
+        removeFromTree(curNode);
+        insertNode(curNode, leftmostNode, 0);
+        leftmostNode = bTree[leftmostNode].leftChild;
+    }
+    // move right hard block
+    int leftrightNode = leftmostNode;
+    for ( int i = 0; i < rightBlock.size(); i++ ) {
+        int curNode = id2BlockListIndex[rightBlock[i]->id];
+        removeFromTree(curNode);
+        insertNode(curNode, leftrightNode, 1);
+        leftrightNode = bTree[leftrightNode].rightChild;
+    }
+
+    // traverse to rightmost node
+    int rightmostNode = 1;
+    while ( bTree[rightmostNode].rightChild != 0 ) {
+        rightmostNode = bTree[rightmostNode].rightChild;
+    }
+    // move left hard block
+    for ( int i = 0; i < leftBlock.size(); i++ ) {
+        int curNode = id2BlockListIndex[leftBlock[i]->id];
+        removeFromTree(curNode);
+        insertNode(curNode, rightmostNode, 1);
+        rightmostNode = bTree[rightmostNode].rightChild;
+    }
+    // move top hard block
+    int rightleftNode = rightmostNode;
+    for ( int i = 0; i < topBlock.size(); i++ ) {
+        int curNode = id2BlockListIndex[topBlock[i]->id];
+        removeFromTree(curNode);
+        insertNode(curNode, rightleftNode, 0);
+        rightleftNode = bTree[rightleftNode].leftChild;
+    }
+
+    this->isRendered = false;
     // bool isLegal = checkLegal();
     render();
 }
@@ -222,7 +316,7 @@ int BStarTree::perturbResizeSoftBlock(Block* blockPointer, bool toSquare){
         } 
     }
 
-    if (smallerValue == newSmallValue){
+    if (smallerValue == newSmallValue || newSmallValue * 2 > newLargeValue){
         return 0;
     }
 
@@ -478,6 +572,7 @@ int BStarTree::perturbSwapNode(Block* swap_a, Block* swap_b){
     }
     
     this->isRendered = false;
+    return 1;
 }
 
 void BStarTree::boundingBox(int* width, int* height){
@@ -529,17 +624,18 @@ void BStarTree::printTree(std::string filename){
 
 }
 
-void BStarTree::printFloorplan(std::string filename, int fixedOutlineWidth, int fixedOutlineHeight){
+void BStarTree::printFloorplan(std::string filename, int fixedOutlineWidth, int fixedOutlineHeight) {
     std::ofstream fout(filename, std::ofstream::out);
     if (!fout.is_open()){
         return;
     }
-    int frameWidth = boundingBoxMaxX > fixedOutlineWidth ? boundingBoxMaxX+100 : fixedOutlineWidth+100;
-    int frameHeight = boundingBoxMaxY > fixedOutlineHeight ? boundingBoxMaxY+100 : fixedOutlineHeight+100;
-    fout << total_block_num+1 << '\n';
+    int frameWidth = boundingBoxMaxX > fixedOutlineWidth ? boundingBoxMaxX + 100 : fixedOutlineWidth + 100;
+    int frameHeight = boundingBoxMaxY > fixedOutlineHeight ? boundingBoxMaxY + 100 : fixedOutlineHeight + 100;
+    fout << total_block_num + 1 << '\n';
     fout << frameWidth << ' ' << frameHeight << '\n';
-    fout << "-1 0 0 " << fixedOutlineWidth << ' ' << fixedOutlineHeight << '\n';
-    for (int i = 1; i <= total_block_num; i++){
-        fout << i+1 << ' ' <<  blockList[i]->block_x << ' ' <<  blockList[i]->block_y << ' ' <<  blockList[i]->width << ' ' <<  blockList[i]->height << '\n';
+    fout << "OUTLINE -1 0 0 " << fixedOutlineWidth << ' ' << fixedOutlineHeight << " DIE_BLOCK" << '\n';
+    for ( int i = 1; i <= total_block_num; i++ ) {
+        std::string type = ( blockList[i]->blocktype == SOFT_BLOCK ) ? "SOFT_BLOCK" : "HARD_BLOCK";
+        fout << blockList[i]->blockname << ' ' << i + 1 << ' ' << blockList[i]->block_x << ' ' << blockList[i]->block_y << ' ' << blockList[i]->width << ' ' << blockList[i]->height << ' ' << type << '\n';
     }
 }
