@@ -21,8 +21,10 @@ private:
     bool checkLegal();
     void dfs(int blockIndex, int parentx, int parenty, std::list<std::pair<int,int>>& horiContour);
     void insertNode(int moveIndex, int destinationIndex, bool rightChildOfDest);
-    void removeFromTree(int removeIndex);
-    void recursiveBubbleUpNode(int blockIndex, int isWhichChild);
+    void removeFromTree(int removeIndex, bool dontTouchPPM);
+    void recursiveBubbleUpNode(int blockIndex, int isWhichChild, bool dontTouchPPM);
+    void simpleDFS(int index, std::vector<int>& isTraversed);
+
     int soft_block_num;
     int hard_block_num;
     int total_block_num;
@@ -67,6 +69,8 @@ public:
     void render();
     bool getisLegal(){return this->isLegal;}
     bool getisRendered(){return this->isRendered;}
+    
+    bool checkTreeValid();
 };
 
 

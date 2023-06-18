@@ -406,6 +406,7 @@ int main(int argc, char *argv[]){
                 default:    //swap
                     BST.perturbSwapNode(soft_modules_vector[sa_target0], soft_modules_vector[sa_target1]);
                     // cout <<"Swap SB" <<sa_target0 << "with SB"<<target1;
+                    // BST.checkTreeValid();
             }
             // cout << endl;
             BST.render();

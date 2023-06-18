@@ -225,6 +225,15 @@ void BStarTree::init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_H
         this->id2BlockListIndex.insert(std::pair<int, int>(currentBlockPointer->id, i));
     }
 
+    for ( int i = 1; i <= blockVector.size(); i++ ) {
+        Block* currentBlockPointer = blockVector[i - 1];
+
+        if ( currentBlockPointer->blocktype == SOFT_BLOCK )
+            continue;
+        int curNode = id2BlockListIndex[currentBlockPointer->id];
+        removeFromTree(curNode, 0);
+    }
+
     std::sort(bottomBlock.begin(), bottomBlock.end(), [](Block* a, Block* b) {return a->block_x < b->block_x; });
     std::sort(leftBlock.begin(), leftBlock.end(), [](Block* a, Block* b) {return a->block_y < b->block_y; });
     std::sort(rightBlock.begin(), rightBlock.end(), [](Block* a, Block* b) {return a->block_y < b->block_y; });
@@ -238,7 +247,7 @@ void BStarTree::init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_H
     // move bottom hard block
     for ( int i = 0; i < bottomBlock.size(); i++ ) {
         int curNode = id2BlockListIndex[bottomBlock[i]->id];
-        removeFromTree(curNode);
+        //removeFromTree(curNode);
         insertNode(curNode, leftmostNode, 0);
         leftmostNode = bTree[leftmostNode].leftChild;
     }
@@ -246,7 +255,7 @@ void BStarTree::init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_H
     int leftrightNode = leftmostNode;
     for ( int i = 0; i < rightBlock.size(); i++ ) {
         int curNode = id2BlockListIndex[rightBlock[i]->id];
-        removeFromTree(curNode);
+        //removeFromTree(curNode);
         insertNode(curNode, leftrightNode, 1);
         leftrightNode = bTree[leftrightNode].rightChild;
     }
@@ -259,7 +268,7 @@ void BStarTree::init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_H
     // move left hard block
     for ( int i = 0; i < leftBlock.size(); i++ ) {
         int curNode = id2BlockListIndex[leftBlock[i]->id];
-        removeFromTree(curNode);
+        //removeFromTree(curNode);
         insertNode(curNode, rightmostNode, 1);
         rightmostNode = bTree[rightmostNode].rightChild;
     }
@@ -267,7 +276,7 @@ void BStarTree::init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_H
     int rightleftNode = rightmostNode;
     for ( int i = 0; i < topBlock.size(); i++ ) {
         int curNode = id2BlockListIndex[topBlock[i]->id];
-        removeFromTree(curNode);
+        //removeFromTree(curNode);
         insertNode(curNode, rightleftNode, 0);
         rightleftNode = bTree[rightleftNode].leftChild;
     }
@@ -316,7 +325,7 @@ int BStarTree::perturbResizeSoftBlock(Block* blockPointer, bool toSquare){
         } 
     }
 
-    if (smallerValue == newSmallValue || newSmallValue * 2 > newLargeValue){
+    if (smallerValue == newSmallValue || newSmallValue * 2 < newLargeValue){
         return 0;
     }
 
@@ -332,7 +341,7 @@ int BStarTree::perturbMoveBlock(Block* move_node, Block* to_parent_node){
     if (moveNodeIndex == destinationNodeIndex){
         return 0;
     }
-    removeFromTree(moveNodeIndex);
+    removeFromTree(moveNodeIndex, 1);
     int leftOrRight = dist1(rng);
     insertNode(moveNodeIndex, destinationNodeIndex, (bool)leftOrRight);
 
@@ -340,14 +349,71 @@ int BStarTree::perturbMoveBlock(Block* move_node, Block* to_parent_node){
     return 1;
 }
 
-void BStarTree::removeFromTree(int removeIndex){
+/// @param dontTouchPPM set to 0 during init, set to 1 during perturbation
+void BStarTree::removeFromTree(int removeIndex, bool dontTouchPPM){
     int leftOrRight = dist1(rng);
-    // randomly choose left or right child to "bubble up" to original node 1 position
-    if (bTree[removeIndex].leftChild != 0 && (leftOrRight == 0 || bTree[removeIndex].rightChild == 0)){
+    int leftChildIndex = bTree[removeIndex].leftChild;
+    int rightChildIndex = bTree[removeIndex].rightChild;
+    int parentIndex = bTree[removeIndex].parent;
+    bool leftChildIsPPM, rightChildIsPPM;
+    if (leftChildIndex != 0){
+        if ((blockList[leftChildIndex]->blocktype) == HARD_BLOCK)
+            leftChildIsPPM = true;
+        else 
+            leftChildIsPPM = false;
+    } 
+    else 
+        leftChildIsPPM = false;
+
+    if (rightChildIndex != 0){
+        if ((blockList[rightChildIndex]->blocktype) == HARD_BLOCK)
+            rightChildIsPPM = true;
+        else 
+            rightChildIsPPM = false;
+    } 
+    else 
+        rightChildIsPPM = false;
+
+    // choose left or right child to "bubble up" to original node 1 position
+    int finalDecision;
+    if (rightChildIndex == 0 && leftChildIndex != 0){
+        // left has node, right empty
+        // always choose left
+        finalDecision = 0;
+    }
+    else if (rightChildIndex != 0 && leftChildIndex == 0){
+        // left empty, right has node
+        // always choose right
+        finalDecision = 1;
+    }
+    // both empty
+    else if (rightChildIndex == 0 && leftChildIndex == 0){
+        finalDecision = 2;
+    }
+    // both have node
+    else if (dontTouchPPM){
+        if (!leftChildIsPPM && rightChildIsPPM){
+            finalDecision = 0;
+        }
+        else if (leftChildIsPPM && !rightChildIsPPM){
+            finalDecision = 1;
+        }
+        else if (!leftChildIsPPM && !rightChildIsPPM){
+            finalDecision = leftOrRight;
+        }
+        else {
+            // both children are ppm, should not happen
+            std::cerr << "[ERROR] In removeFromTree, both children are PPM\n";
+            return;
+        }
+    }
+    else {
+        finalDecision = leftOrRight;
+    }
+
+    if (finalDecision == 0){
         //left
-        int leftChildIndex = bTree[removeIndex].leftChild;
-        int parentIndex = bTree[removeIndex].parent;
-        recursiveBubbleUpNode(leftChildIndex, 0);
+        recursiveBubbleUpNode(leftChildIndex, 0, dontTouchPPM);
         bTree[leftChildIndex].setParent(parentIndex); 
         if (bTree[parentIndex].leftChild == removeIndex){
             bTree[parentIndex].setLeftChild(leftChildIndex);
@@ -356,11 +422,9 @@ void BStarTree::removeFromTree(int removeIndex){
             bTree[parentIndex].setRightChild(leftChildIndex);
         }
     }
-    else if (bTree[removeIndex].rightChild != 0 && (leftOrRight == 1 || bTree[removeIndex].leftChild == 0)){
+    else if (finalDecision == 1){
         //right 
-        int rightChildIndex = bTree[removeIndex].rightChild;
-        int parentIndex = bTree[removeIndex].parent;
-        recursiveBubbleUpNode(rightChildIndex, 1);
+        recursiveBubbleUpNode(rightChildIndex, 1, dontTouchPPM);
         bTree[rightChildIndex].setParent(parentIndex); 
         if (bTree[parentIndex].leftChild == removeIndex){
             bTree[parentIndex].setLeftChild(rightChildIndex);
@@ -371,7 +435,6 @@ void BStarTree::removeFromTree(int removeIndex){
     }
     else {
         // childless
-        int parentIndex = bTree[removeIndex].parent;
         if (bTree[parentIndex].leftChild == removeIndex){
             bTree[parentIndex].setLeftChild(0);
         }
@@ -381,19 +444,82 @@ void BStarTree::removeFromTree(int removeIndex){
     }
 }
 
-void BStarTree::recursiveBubbleUpNode(int blockIndex, int isWhichChild){
-    // update pointers of the bottommost node first, call recursive function on random children
+void BStarTree::recursiveBubbleUpNode(int blockIndex, int isWhichChild, bool dontTouchPPM){
+    // if donttouchppm, treat all ppm as leaf nodes
+    if (dontTouchPPM && (blockList[blockIndex]->blocktype) == HARD_BLOCK)
+        return;
+
+    // update pointers of the bottommost node (leaf nodes) first, call this recursive function on children
     int leftOrRight = dist1(rng);
-    int child = 0;
-    if (bTree[blockIndex].leftChild != 0 && (leftOrRight == 0 || bTree[blockIndex].rightChild == 0)){
-        // left
-        recursiveBubbleUpNode(bTree[blockIndex].leftChild, 0);
-        child = bTree[blockIndex].leftChild;
+    int leftChildIndex = bTree[blockIndex].leftChild;
+    int rightChildIndex = bTree[blockIndex].rightChild;
+    int parentIndex = bTree[blockIndex].parent;
+    bool leftChildIsPPM, rightChildIsPPM;
+    if (leftChildIndex != 0){
+        if ((blockList[leftChildIndex]->blocktype) == HARD_BLOCK)
+            leftChildIsPPM = true;
+        else 
+            leftChildIsPPM = false;
+    } 
+    else 
+        leftChildIsPPM = false;
+
+    if (rightChildIndex != 0){
+        if ((blockList[rightChildIndex]->blocktype) == HARD_BLOCK)
+            rightChildIsPPM = true;
+        else 
+            rightChildIsPPM = false;
+    } 
+    else 
+        rightChildIsPPM = false;
+
+    int finalDecision;
+    if (rightChildIndex == 0 && leftChildIndex != 0){
+        // left has node, right empty
+        // always choose left
+        finalDecision = 0;
     }
-    else if (bTree[blockIndex].rightChild != 0 && (leftOrRight == 1 || bTree[blockIndex].leftChild == 0)){
+    else if (rightChildIndex != 0 && leftChildIndex == 0){
+        // left empty, right has node
+        // always choose right
+        finalDecision = 1;
+    }
+    // both empty
+    else if (rightChildIndex == 0 && leftChildIndex == 0){
+        finalDecision = 2;
+    }
+    // both have node
+    else if (dontTouchPPM){
+        if (!leftChildIsPPM && rightChildIsPPM){
+            finalDecision = 0;
+        }
+        else if (leftChildIsPPM && !rightChildIsPPM){
+            finalDecision = 1;
+        }
+        else if (!leftChildIsPPM && !rightChildIsPPM){
+            finalDecision = leftOrRight;
+        }
+        else {
+            // both children are ppm, should not happen
+            std::cerr << "[ERROR] In recursiveBubbleUpNode, both children are PPM\n";
+            return;
+        }
+    }
+    else {
+        finalDecision = leftOrRight;
+    }
+
+
+    int child = 0;
+    if (finalDecision == 0){
+        // left
+        recursiveBubbleUpNode(leftChildIndex, 0, dontTouchPPM);
+        child = leftChildIndex;
+    }
+    else if (finalDecision == 1){
         //right
-        recursiveBubbleUpNode(bTree[blockIndex].rightChild, 1);
-        child = bTree[blockIndex].rightChild;
+        recursiveBubbleUpNode(rightChildIndex, 1, dontTouchPPM);
+        child = rightChildIndex;
     }
 
     if (isWhichChild == 0){
@@ -445,61 +571,6 @@ void BStarTree::insertNode(int moveIndex, int destinationIndex, bool rightChildO
     }
 }
 
-
-// void BStarTree::insertNode(int moveIndex, int destinationIndex){
-//     int leftOrRight = dist1(rng);
-//     int anotherLeftOrRight = dist1(rng);
-//     if (leftOrRight == 0){
-//         // node1 will be inserted in left child of node 2
-//         if (anotherLeftOrRight == 0){
-//             // original left child of node 2 will become left child of node1
-//             if (bTree[destinationIndex].leftChild != 0){
-//                 int leftChildIndex = bTree[destinationIndex].leftChild;
-//                 bTree[leftChildIndex].setParent(moveIndex);
-//             }
-//             bTree[moveIndex].setLeftChild(bTree[destinationIndex].leftChild);
-//             bTree[moveIndex].setRightChild(0);
-//             bTree[moveIndex].setParent(destinationIndex);
-//             bTree[destinationIndex].setLeftChild(moveIndex);
-//         }
-//         else {
-//             // original left child of node 2 will become right child of node1            
-//             if (bTree[destinationIndex].leftChild != 0){
-//                 int leftChildIndex = bTree[destinationIndex].leftChild;
-//                 bTree[leftChildIndex].setParent(moveIndex);
-//             }
-//             bTree[moveIndex].setLeftChild(0);
-//             bTree[moveIndex].setRightChild(bTree[destinationIndex].leftChild);
-//             bTree[moveIndex].setParent(destinationIndex);
-//             bTree[destinationIndex].setLeftChild(moveIndex);
-//         }
-//     }
-//     else {
-//         // node 1 will be inserted in right child of node 2
-//         if (anotherLeftOrRight == 0){
-//             // original right child of node 2 will become left child of node1         
-//             if (bTree[destinationIndex].rightChild != 0){
-//                 int rightChildIndex = bTree[destinationIndex].rightChild;
-//                 bTree[rightChildIndex].setParent(moveIndex);
-//             }
-//             bTree[moveIndex].setLeftChild(bTree[destinationIndex].rightChild);
-//             bTree[moveIndex].setRightChild(0);
-//             bTree[moveIndex].setParent(destinationIndex);
-//             bTree[destinationIndex].setRightChild(moveIndex);   
-//         }
-//         else {
-//             // original right child of node 2 will become right child of node1
-//             if (bTree[destinationIndex].rightChild != 0){
-//                 int rightChildIndex = bTree[destinationIndex].rightChild;
-//                 bTree[rightChildIndex].setParent(moveIndex);
-//             }
-//             bTree[moveIndex].setLeftChild(0);
-//             bTree[moveIndex].setRightChild(bTree[destinationIndex].rightChild);
-//             bTree[moveIndex].setParent(destinationIndex);
-//             bTree[destinationIndex].setRightChild(moveIndex);   
-//         }
-//     }
-// }
 
 int BStarTree::perturbSwapNode(Block* swap_a, Block* swap_b){
     int node1Index = id2BlockListIndex[swap_a->id];
@@ -638,4 +709,26 @@ void BStarTree::printFloorplan(std::string filename, int fixedOutlineWidth, int 
         std::string type = ( blockList[i]->blocktype == SOFT_BLOCK ) ? "SOFT_BLOCK" : "HARD_BLOCK";
         fout << blockList[i]->blockname << ' ' << i + 1 << ' ' << blockList[i]->block_x << ' ' << blockList[i]->block_y << ' ' << blockList[i]->width << ' ' << blockList[i]->height << ' ' << type << '\n';
     }
+}
+
+bool BStarTree::checkTreeValid(){
+    std::vector<int> isTraversed(total_block_num);
+    std::fill(isTraversed.begin(), isTraversed.end(), 0);
+    simpleDFS(bTree[0].rightChild, isTraversed);
+
+    bool normal = true;
+    for (int i = 0; i < total_block_num; i++){
+        if (isTraversed[i] != 1){
+            normal = false; 
+            std::cerr << "[ERROR] in checkTreeValid bTree NOT NORMAL\n";
+        }
+    }
+    return normal;
+}
+
+void BStarTree::simpleDFS(int index, std::vector<int>& isTraversed){
+    if (index == 0) return;
+    isTraversed[index-1] = isTraversed[index-1] + 1;
+    simpleDFS(bTree[index].leftChild, isTraversed);
+    simpleDFS(bTree[index].rightChild, isTraversed);
 }
