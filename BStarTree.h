@@ -10,16 +10,24 @@
 #include "Node.h"
 #include "Block.h"
 
-typedef enum Direction{ 
-    LEFT, 
-    RIGHT 
+typedef enum Direction {
+    LEFT,
+    RIGHT
 } DIRECTION;
 
-class BStarTree{
+
+class Connection {
+public:
+    Block* first;
+    Block* second;
+    int num_nets;
+};
+
+class BStarTree {
 
 private:
     bool checkLegal();
-    void dfs(int blockIndex, int parentx, int parenty, std::list<std::pair<int,int>>& horiContour);
+    void dfs(int blockIndex, int parentx, int parenty, std::list< std::pair<int, int> >& horiContour);
     void insertNode(int moveIndex, int destinationIndex, bool rightChildOfDest);
     void removeFromTree(int removeIndex, bool dontTouchPPM);
     void recursiveBubbleUpNode(int blockIndex, int isWhichChild, bool dontTouchPPM);
@@ -28,13 +36,14 @@ private:
     int soft_block_num;
     int hard_block_num;
     int total_block_num;
+    int originX, originY;
     int boundingBoxMaxX, boundingBoxMaxY;
     bool isRendered;
     bool isLegal;
-    
+
     std::vector<Node> bTree;
     std::vector<Block*> blockList;
-    std::map<int,int> id2BlockListIndex;
+    std::map<int, int> id2BlockListIndex;
 
     std::vector<Node> bestBTree;
     std::vector<Node> savedBTree;
@@ -44,8 +53,11 @@ private:
 
 public:
     BStarTree();
-    
+
     void init(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_HEIGHT);
+
+    void noPPMInit(std::vector<Block*> blockVector, int CHIP_WIDTH, int CHIP_HEIGHT,
+        int* modifiedChipWidth, int* modifiedChipHeight);
 
     int perturbRotateBlock(Block* blockPointer);
 
@@ -56,7 +68,7 @@ public:
     int perturbSwapNode(Block* swap_a, Block* swap_b);
 
     void boundingBox(int* width, int* height);
-    
+
     void saveBest();
     void loadBest();
 
@@ -64,12 +76,12 @@ public:
     void loadPrevCurrent();
 
     void printTree(std::string filename);
-    void printFloorplan(std::string filename, int fixedOutlineWidth, int fixedOutlineHeight);
-    
+    void printFloorplan(std::string filename, int fixedOutlineWidth, int fixedOutlineHeight, std::vector<Connection*>& connection_vector);
+
     void render();
-    bool getisLegal(){return this->isLegal;}
-    bool getisRendered(){return this->isRendered;}
-    
+    bool getisLegal() { return this->isLegal; }
+    bool getisRendered() { return this->isRendered; }
+
     bool checkTreeValid();
 };
 
